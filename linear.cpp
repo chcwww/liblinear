@@ -101,7 +101,7 @@ void Reduce_Vectors::reduce_sum(double* v)
 {
 #pragma omp parallel for schedule(static)
 	for(int i = 0; i < size; i++)
-    {
+	{
 		v[i] = 0;
 		for(int j = 0; j < nr_thread; j++)
 			v[i] += tmp_array[j][i];
@@ -214,11 +214,11 @@ void l2r_lr_fun::Hv(double *s, double *Hs)
 
 #pragma omp parallel for private(i) schedule(guided)
 	for(i=0;i<l;i++)
-    {
+	{
 		feature_node *xi=prob->x[i];
 		wa[i] = 0;
 		while(xi->index != -1)
-        {
+		{
 			wa[i] += s[xi->index-1]*xi->value;
 			xi++;
 		}
@@ -264,7 +264,7 @@ void l2r_lr_fun::XTv(double *v, double *XTv)
 	for(i=0;i<l;i++)
 		reduce_vectors->sum_scale_x(v[i], x[i]);
 	
-    reduce_vectors->reduce_sum(XTv);
+	reduce_vectors->reduce_sum(XTv);
 }
 
 class l2r_l2_svc_fun: public function
@@ -378,7 +378,7 @@ void l2r_l2_svc_fun::Hv(double *s, double *Hs)
 
 #pragma omp parallel for private(i) schedule(guided)
 	for(i=0;i<sizeI;i++)
-    {
+	{
 		feature_node *xi = x[I[i]];
 		wa[i] = 0.0;
 		while(xi->index!=-1)
