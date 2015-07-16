@@ -270,12 +270,12 @@ int parse_command_line(int nrhs, const mxArray *prhs[], char *model_file_name)
 	{
 		if(!flag_solver_specified)
 		{
-			mexprintf("Solver not specified. Using -s 2\n");
+			mexPrintf("Solver not specified. Using -s 2\n");
 			param.solver_type = L2R_L2LOSS_SVC;
 		}
 		else if(param.solver_type != L2R_LR && param.solver_type != L2R_L2LOSS_SVC && param.solver_type != L2R_L2LOSS_SVR)
 		{
-			mexprintf("Parallel LIBLINEAR is only available for -s 0, 2, 11 now.\n");
+			mexPrintf("Parallel LIBLINEAR is only available for -s 0, 2, 11 now.\n");
 			return 1;
 		}
 	}
