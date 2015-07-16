@@ -6,6 +6,7 @@
 #include <locale.h>
 #include "linear.h"
 #include "tron.h"
+#include <omp.h>
 typedef signed char schar;
 template <class T> static inline void swap(T& x, T& y) { T t=x; x=y; y=t; }
 #ifndef min
@@ -45,6 +46,68 @@ static void info(const char *fmt,...)
 static void info(const char *fmt,...) {}
 #endif
 
+class Reduce_Vectors
+{
+public:
+	Reduce_Vectors(int size);
+	~Reduce_Vectors();
+
+	void init(void);
+	void sum_scale_x(double scalar, feature_node *x);
+	void reduce_sum(double* v);
+
+private:
+	int nr_thread;
+	int size;
+	double **tmp_array;
+};
+
+Reduce_Vectors::Reduce_Vectors(int size)
+{
+	nr_thread = omp_get_max_threads();
+	this->size = size;
+	tmp_array = new double*[nr_thread];
+	for(int i = 0; i < nr_thread; i++)
+		tmp_array[i] = new double[size];
+}
+
+Reduce_Vectors::~Reduce_Vectors(void)
+{
+	for(int i = 0; i < nr_thread; i++)
+		delete[] tmp_array[i];
+	delete[] tmp_array;
+}
+
+void Reduce_Vectors::init(void)
+{
+#pragma omp parallel for schedule(static)
+	for(int i = 0; i < size; i++)
+		for(int j = 0; j < nr_thread; j++)
+			tmp_array[j][i] = 0.0;
+}
+
+void Reduce_Vectors::sum_scale_x(double scalar, feature_node *x)
+{
+	int thread_id = omp_get_thread_num();
+
+	while(x->index!=-1)
+	{
+		tmp_array[thread_id][x->index-1] += (scalar)*(x->value);
+		x++;
+	}
+}
+
+void Reduce_Vectors::reduce_sum(double* v)
+{
+#pragma omp parallel for schedule(static)
+	for(int i = 0; i < size; i++)
+    {
+		v[i] = 0;
+		for(int j = 0; j < nr_thread; j++)
+			v[i] += tmp_array[j][i];
+	}
+}
+
 class l2r_lr_fun: public function
 {
 public:
@@ -64,6 +127,8 @@ private:
 	double *C;
 	double *z;
 	double *D;
+	Reduce_Vectors *reduce_vectors;
+
 	const problem *prob;
 };
 
@@ -75,6 +140,9 @@ l2r_lr_fun::l2r_lr_fun(const problem *prob, double *C)
 
 	z = new double[l];
 	D = new double[l];
+
+	reduce_vectors = new Reduce_Vectors(get_nr_variable());
+
 	this->C = C;
 }
 
@@ -82,6 +150,7 @@ l2r_lr_fun::~l2r_lr_fun()
 {
 	delete[] z;
 	delete[] D;
+	delete reduce_vectors;
 }
 
 
@@ -141,11 +210,24 @@ void l2r_lr_fun::Hv(double *s, double *Hs)
 	int w_size=get_nr_variable();
 	double *wa = new double[l];
 
-	Xv(s, wa);
-	for(i=0;i<l;i++)
-		wa[i] = C[i]*D[i]*wa[i];
+	reduce_vectors->init();
 
-	XTv(wa, Hs);
+#pragma omp parallel for private(i) schedule(guided)
+	for(i=0;i<l;i++)
+    {
+		feature_node *xi=prob->x[i];
+		wa[i] = 0;
+		while(xi->index != -1)
+        {
+			wa[i] += s[xi->index-1]*xi->value;
+			xi++;
+		}
+		wa[i] = C[i]*D[i]*wa[i];
+	
+		reduce_vectors->sum_scale_x(wa[i], prob->x[i]);
+	}
+
+	reduce_vectors->reduce_sum(Hs);
 	for(i=0;i<w_size;i++)
 		Hs[i] = s[i] + Hs[i];
 	delete[] wa;
@@ -157,6 +239,7 @@ void l2r_lr_fun::Xv(double *v, double *Xv)
 	int l=prob->l;
 	feature_node **x=prob->x;
 
+#pragma omp parallel for private (i) schedule(guided)
 	for(i=0;i<l;i++)
 	{
 		feature_node *s=x[i];
@@ -173,20 +256,15 @@ void l2r_lr_fun::XTv(double *v, double *XTv)
 {
 	int i;
 	int l=prob->l;
-	int w_size=get_nr_variable();
 	feature_node **x=prob->x;
 
-	for(i=0;i<w_size;i++)
-		XTv[i]=0;
+	reduce_vectors->init();
+
+#pragma omp parallel for private(i) schedule(guided)
 	for(i=0;i<l;i++)
-	{
-		feature_node *s=x[i];
-		while(s->index!=-1)
-		{
-			XTv[s->index-1]+=v[i]*s->value;
-			s++;
-		}
-	}
+		reduce_vectors->sum_scale_x(v[i], x[i]);
+	
+    reduce_vectors->reduce_sum(XTv);
 }
 
 class l2r_l2_svc_fun: public function
@@ -209,6 +287,8 @@ protected:
 	double *C;
 	double *z;
 	double *D;
+	Reduce_Vectors *reduce_vectors;
+
 	int *I;
 	int sizeI;
 	const problem *prob;
@@ -222,6 +302,9 @@ l2r_l2_svc_fun::l2r_l2_svc_fun(const problem *prob, double *C)
 
 	z = new double[l];
 	D = new double[l];
+
+	reduce_vectors = new Reduce_Vectors(get_nr_variable());
+
 	I = new int[l];
 	this->C = C;
 }
@@ -231,6 +314,7 @@ l2r_l2_svc_fun::~l2r_l2_svc_fun()
 	delete[] z;
 	delete[] D;
 	delete[] I;
+	delete reduce_vectors;
 }
 
 double l2r_l2_svc_fun::fun(double *w)
@@ -288,12 +372,26 @@ void l2r_l2_svc_fun::Hv(double *s, double *Hs)
 	int i;
 	int w_size=get_nr_variable();
 	double *wa = new double[sizeI];
+	feature_node **x=prob->x;
 
-	subXv(s, wa);
+	reduce_vectors->init();
+
+#pragma omp parallel for private(i) schedule(guided)
 	for(i=0;i<sizeI;i++)
+    {
+		feature_node *xi = x[I[i]];
+		wa[i] = 0.0;
+		while(xi->index!=-1)
+		{
+			wa[i] += s[xi->index-1]*xi->value;
+			xi++;
+		}
 		wa[i] = C[I[i]]*wa[i];
 
-	subXTv(wa, Hs);
+		reduce_vectors->sum_scale_x(wa[i], x[I[i]]);
+	}
+	
+	reduce_vectors->reduce_sum(Hs);
 	for(i=0;i<w_size;i++)
 		Hs[i] = s[i] + 2*Hs[i];
 	delete[] wa;
@@ -305,6 +403,7 @@ void l2r_l2_svc_fun::Xv(double *v, double *Xv)
 	int l=prob->l;
 	feature_node **x=prob->x;
 
+#pragma omp parallel for private(i) schedule(guided)
 	for(i=0;i<l;i++)
 	{
 		feature_node *s=x[i];
@@ -322,6 +421,7 @@ void l2r_l2_svc_fun::subXv(double *v, double *Xv)
 	int i;
 	feature_node **x=prob->x;
 
+#pragma omp parallel for private(i) schedule(guided)
 	for(i=0;i<sizeI;i++)
 	{
 		feature_node *s=x[I[i]];
@@ -337,20 +437,15 @@ void l2r_l2_svc_fun::subXv(double *v, double *Xv)
 void l2r_l2_svc_fun::subXTv(double *v, double *XTv)
 {
 	int i;
-	int w_size=get_nr_variable();
 	feature_node **x=prob->x;
 
-	for(i=0;i<w_size;i++)
-		XTv[i]=0;
+	reduce_vectors->init();
+
+#pragma omp parallel for private(i) schedule(guided)
 	for(i=0;i<sizeI;i++)
-	{
-		feature_node *s=x[I[i]];
-		while(s->index!=-1)
-		{
-			XTv[s->index-1]+=v[i]*s->value;
-			s++;
-		}
-	}
+		reduce_vectors->sum_scale_x(v[i], x[I[i]]);
+
+	reduce_vectors->reduce_sum(XTv);
 }
 
 class l2r_l2_svr_fun: public l2r_l2_svc_fun
@@ -2339,6 +2434,9 @@ model* train(const problem *prob, const parameter *param)
 		model_->nr_feature=n;
 	model_->param = *param;
 	model_->bias = prob->bias;
+
+	omp_set_num_threads(param->nr_thread);
+	info("Total threads used: %d\n", omp_get_max_threads());
 
 	if(check_regression_model(model_))
 	{
