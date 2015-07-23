@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include "linear.h"
+#include <omp.h>
 #define Malloc(type,n) (type *)malloc((n)*sizeof(type))
 #define INF HUGE_VAL
 
@@ -339,6 +340,13 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 			fprintf(stderr, "Parallel LIBLINEAR is only available for -s 0, 2, 11 now\n");
 			exit_with_help();
 		}
+#ifdef CV_OMP
+		omp_set_nested(1);
+		omp_set_num_threads(nr_fold);
+		printf("Total threads used: %d\n", nr_fold*param.nr_thread);
+#else
+		printf("Total threads used: %d\n", param.nr_thread);
+#endif
 	}
 
 	if(param.eps == INF)

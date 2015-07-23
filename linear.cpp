@@ -2436,7 +2436,6 @@ model* train(const problem *prob, const parameter *param)
 	model_->bias = prob->bias;
 
 	omp_set_num_threads(param->nr_thread);
-	info("Total threads used: %d\n", omp_get_max_threads());
 
 	if(check_regression_model(model_))
 	{
@@ -2592,6 +2591,9 @@ void cross_validation(const problem *prob, const parameter *param, int nr_fold, 
 	for(i=0;i<=nr_fold;i++)
 		fold_start[i]=i*l/nr_fold;
 
+#ifdef CV_OMP
+#pragma omp parallel for private(i) schedule(dynamic)
+#endif
 	for(i=0;i<nr_fold;i++)
 	{
 		int begin = fold_start[i];
@@ -2701,14 +2703,18 @@ void find_parameter_C(const problem *prob, const parameter *param, int nr_fold, 
 		//Output diabled for running CV at a particular C
 		set_print_string_function(&print_null);
 
+#ifdef CV_OMP
+#pragma omp parallel for private(i) schedule(dynamic)
+#endif
 		for(i=0; i<nr_fold; i++)
 		{
 			int j;
 			int begin = fold_start[i];
 			int end = fold_start[i+1];
 
-			param1.init_sol = prev_w[i];
-			struct model *submodel = train(&subprob[i],&param1);
+			struct parameter param_t = param1;
+			param_t.init_sol = prev_w[i];
+			struct model *submodel = train(&subprob[i],&param_t);
 
 			int total_w_size;
 			if(submodel->nr_class == 2)
