@@ -1,7 +1,7 @@
 CXX ?= g++
 CC ?= gcc
 CFLAGS = -Wall -Wconversion -O3 -fPIC -fopenmp
-# for paralle CV and parameter search, add -D CV_OMP 
+# CFLAGS += -DCV_OMP 
 LIBS = blas/blas.a
 SHVER = 3
 OS = $(shell uname)
