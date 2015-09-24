@@ -45,6 +45,40 @@ static void info(const char *fmt,...)
 #else
 static void info(const char *fmt,...) {}
 #endif
+class sparse_operator
+{
+public:
+	static double nrm2_sq(const feature_node *x)
+	{
+		double ret = 0;
+		while(x->index != -1)
+		{
+			ret += x->value*x->value;
+			x++;
+		}
+		return (ret);
+	}
+
+	static double dot(const double *s, const feature_node *x)
+	{
+		double ret = 0;
+		while(x->index != -1)
+		{
+			ret += s[x->index-1]*x->value;
+			x++;
+		}
+		return (ret);
+	}
+
+	static void axpy(const double a, const feature_node *x, double *y)
+	{
+		while(x->index != -1)
+		{
+			y[x->index-1] += a*x->value;
+			x++;
+		}
+	}
+};
 
 class Reduce_Vectors
 {
@@ -90,11 +124,7 @@ void Reduce_Vectors::sum_scale_x(double scalar, feature_node *x)
 {
 	int thread_id = omp_get_thread_num();
 
-	while(x->index!=-1)
-	{
-		tmp_array[thread_id][x->index-1] += (scalar)*(x->value);
-		x++;
-	}
+	sparse_operator::axpy(scalar, x, tmp_array[thread_id]);
 }
 
 void Reduce_Vectors::reduce_sum(double* v)
@@ -209,22 +239,19 @@ void l2r_lr_fun::Hv(double *s, double *Hs)
 	int l=prob->l;
 	int w_size=get_nr_variable();
 	double *wa = new double[l];
+	feature_node **x=prob->x;
 
 	reduce_vectors->init();
 
 #pragma omp parallel for private(i) schedule(guided)
 	for(i=0;i<l;i++)
 	{
-		feature_node *xi=prob->x[i];
-		wa[i] = 0;
-		while(xi->index != -1)
-		{
-			wa[i] += s[xi->index-1]*xi->value;
-			xi++;
-		}
+		feature_node * const xi=x[i];
+		wa[i] = sparse_operator::dot(s, xi);
+		
 		wa[i] = C[i]*D[i]*wa[i];
-	
-		reduce_vectors->sum_scale_x(wa[i], prob->x[i]);
+
+		reduce_vectors->sum_scale_x(wa[i], xi);
 	}
 
 	reduce_vectors->reduce_sum(Hs);
@@ -241,15 +268,7 @@ void l2r_lr_fun::Xv(double *v, double *Xv)
 
 #pragma omp parallel for private (i) schedule(guided)
 	for(i=0;i<l;i++)
-	{
-		feature_node *s=x[i];
-		Xv[i]=0;
-		while(s->index!=-1)
-		{
-			Xv[i]+=v[s->index-1]*s->value;
-			s++;
-		}
-	}
+		Xv[i]=sparse_operator::dot(v, x[i]);
 }
 
 void l2r_lr_fun::XTv(double *v, double *XTv)
@@ -281,7 +300,6 @@ public:
 
 protected:
 	void Xv(double *v, double *Xv);
-	void subXv(double *v, double *Xv);
 	void subXTv(double *v, double *XTv);
 
 	double *C;
@@ -379,16 +397,12 @@ void l2r_l2_svc_fun::Hv(double *s, double *Hs)
 #pragma omp parallel for private(i) schedule(guided)
 	for(i=0;i<sizeI;i++)
 	{
-		feature_node *xi = x[I[i]];
-		wa[i] = 0.0;
-		while(xi->index!=-1)
-		{
-			wa[i] += s[xi->index-1]*xi->value;
-			xi++;
-		}
+		feature_node * const xi=x[I[i]];
+		wa[i] = sparse_operator::dot(s, xi);
+
 		wa[i] = C[I[i]]*wa[i];
 
-		reduce_vectors->sum_scale_x(wa[i], x[I[i]]);
+		reduce_vectors->sum_scale_x(wa[i], xi);
 	}
 	
 	reduce_vectors->reduce_sum(Hs);
@@ -405,33 +419,7 @@ void l2r_l2_svc_fun::Xv(double *v, double *Xv)
 
 #pragma omp parallel for private(i) schedule(guided)
 	for(i=0;i<l;i++)
-	{
-		feature_node *s=x[i];
-		Xv[i]=0;
-		while(s->index!=-1)
-		{
-			Xv[i]+=v[s->index-1]*s->value;
-			s++;
-		}
-	}
-}
-
-void l2r_l2_svc_fun::subXv(double *v, double *Xv)
-{
-	int i;
-	feature_node **x=prob->x;
-
-#pragma omp parallel for private(i) schedule(guided)
-	for(i=0;i<sizeI;i++)
-	{
-		feature_node *s=x[I[i]];
-		Xv[i]=0;
-		while(s->index!=-1)
-		{
-			Xv[i]+=v[s->index-1]*s->value;
-			s++;
-		}
-	}
+		Xv[i]=sparse_operator::dot(v, x[i]);
 }
 
 void l2r_l2_svc_fun::subXTv(double *v, double *XTv)
@@ -926,14 +914,10 @@ static void solve_l2r_l1l2_svc(
 	{
 		QD[i] = diag[GETI(i)];
 
-		feature_node *xi = prob->x[i];
-		while (xi->index != -1)
-		{
-			double val = xi->value;
-			QD[i] += val*val;
-			w[xi->index-1] += y[i]*alpha[i]*val;
-			xi++;
-		}
+		feature_node * const xi = prob->x[i];
+		QD[i] += sparse_operator::nrm2_sq(xi);
+		sparse_operator::axpy(y[i]*alpha[i], xi, w);
+
 		index[i] = i;
 	}
 
@@ -951,16 +935,10 @@ static void solve_l2r_l1l2_svc(
 		for (s=0; s<active_size; s++)
 		{
 			i = index[s];
-			G = 0;
-			schar yi = y[i];
+			const schar yi = y[i];
+			feature_node * const xi = prob->x[i];
 
-			feature_node *xi = prob->x[i];
-			while(xi->index!= -1)
-			{
-				G += w[xi->index-1]*(xi->value);
-				xi++;
-			}
-			G = G*yi-1;
+			G = yi*sparse_operator::dot(w, xi)-1;
 
 			C = upper_bound[GETI(i)];
 			G += alpha[i]*diag[GETI(i)];
@@ -1001,12 +979,7 @@ static void solve_l2r_l1l2_svc(
 				double alpha_old = alpha[i];
 				alpha[i] = min(max(alpha[i] - G/QD[i], 0.0), C);
 				d = (alpha[i] - alpha_old)*yi;
-				xi = prob->x[i];
-				while (xi->index != -1)
-				{
-					w[xi->index-1] += d*xi->value;
-					xi++;
-				}
+				sparse_operator::axpy(d, xi, w);
 			}
 		}
 
@@ -1131,15 +1104,9 @@ static void solve_l2r_l1l2_svr(
 		w[i] = 0;
 	for(i=0; i<l; i++)
 	{
-		QD[i] = 0;
-		feature_node *xi = prob->x[i];
-		while(xi->index != -1)
-		{
-			double val = xi->value;
-			QD[i] += val*val;
-			w[xi->index-1] += beta[i]*val;
-			xi++;
-		}
+		feature_node * const xi = prob->x[i];
+		QD[i] = sparse_operator::nrm2_sq(xi);
+		sparse_operator::axpy(beta[i], xi, w);
 
 		index[i] = i;
 	}
@@ -1162,14 +1129,8 @@ static void solve_l2r_l1l2_svr(
 			G = -y[i] + lambda[GETI(i)]*beta[i];
 			H = QD[i] + lambda[GETI(i)];
 
-			feature_node *xi = prob->x[i];
-			while(xi->index != -1)
-			{
-				int ind = xi->index-1;
-				double val = xi->value;
-				G += val*w[ind];
-				xi++;
-			}
+			feature_node * const xi = prob->x[i];
+			G += sparse_operator::dot(w, xi);
 
 			double Gp = G+p;
 			double Gn = G-p;
@@ -1236,14 +1197,7 @@ static void solve_l2r_l1l2_svr(
 			d = beta[i]-beta_old;
 
 			if(d != 0)
-			{
-				xi = prob->x[i];
-				while(xi->index != -1)
-				{
-					w[xi->index-1] += d*xi->value;
-					xi++;
-				}
-			}
+				sparse_operator::axpy(d, xi, w);
 		}
 
 		if(iter == 0)
@@ -1356,15 +1310,9 @@ void solve_l2r_lr_dual(const problem *prob, double *w, double eps, double Cp, do
 		w[i] = 0;
 	for(i=0; i<l; i++)
 	{
-		xTx[i] = 0;
-		feature_node *xi = prob->x[i];
-		while (xi->index != -1)
-		{
-			double val = xi->value;
-			xTx[i] += val*val;
-			w[xi->index-1] += y[i]*alpha[2*i]*val;
-			xi++;
-		}
+		feature_node * const xi = prob->x[i];
+		xTx[i] = sparse_operator::nrm2_sq(xi);
+		sparse_operator::axpy(y[i]*alpha[2*i], xi, w);
 		index[i] = i;
 	}
 
@@ -1380,16 +1328,11 @@ void solve_l2r_lr_dual(const problem *prob, double *w, double eps, double Cp, do
 		for (s=0; s<l; s++)
 		{
 			i = index[s];
-			schar yi = y[i];
+			const schar yi = y[i];
 			double C = upper_bound[GETI(i)];
 			double ywTx = 0, xisq = xTx[i];
-			feature_node *xi = prob->x[i];
-			while (xi->index != -1)
-			{
-				ywTx += w[xi->index-1]*xi->value;
-				xi++;
-			}
-			ywTx *= y[i];
+			feature_node * const xi = prob->x[i];
+			ywTx = yi*sparse_operator::dot(w, xi);
 			double a = xisq, b = ywTx;
 
 			// Decide to minimize g_1(z) or g_2(z)
@@ -1431,12 +1374,7 @@ void solve_l2r_lr_dual(const problem *prob, double *w, double eps, double Cp, do
 			{
 				alpha[ind1] = z;
 				alpha[ind2] = C-z;
-				xi = prob->x[i];
-				while (xi->index != -1)
-				{
-					w[xi->index-1] += sign*(z-alpha_old)*yi*xi->value;
-					xi++;
-				}
+				sparse_operator::axpy(sign*(z-alpha_old)*yi, xi, w);
 			}
 		}
 
@@ -1630,11 +1568,7 @@ static void solve_l1r_l2_svc(
 				if(appxcond <= 0)
 				{
 					x = prob_col->x[j];
-					while(x->index != -1)
-					{
-						b[x->index-1] += d_diff*x->value;
-						x++;
-					}
+					sparse_operator::axpy(d_diff, x, b);
 					break;
 				}
 
@@ -1694,11 +1628,7 @@ static void solve_l1r_l2_svc(
 				{
 					if(w[i]==0) continue;
 					x = prob_col->x[i];
-					while(x->index != -1)
-					{
-						b[x->index-1] -= w[i]*x->value;
-						x++;
-					}
+					sparse_operator::axpy(-w[i], x, b);
 				}
 			}
 		}
@@ -1987,12 +1917,7 @@ static void solve_l1r_lr(
 				wpd[j] += z;
 
 				x = prob_col->x[j];
-				while(x->index != -1)
-				{
-					int ind = x->index-1;
-					xTd[ind] += x->value*z;
-					x++;
-				}
+				sparse_operator::axpy(z, x, xTd);
 			}
 
 			iter++;
@@ -2084,11 +2009,7 @@ static void solve_l1r_lr(
 			{
 				if(w[i]==0) continue;
 				x = prob_col->x[i];
-				while(x->index != -1)
-				{
-					exp_wTx[x->index-1] += w[i]*x->value;
-					x++;
-				}
+				sparse_operator::axpy(w[i], x, exp_wTx);
 			}
 
 			for(int i=0; i<l; i++)
@@ -2700,7 +2621,7 @@ void find_parameter_C(const problem *prob, const parameter *param, int nr_fold, 
 
 	while(param1.C <= max_C)
 	{
-		//Output diabled for running CV at a particular C
+		//Output disabled for running CV at a particular C
 		set_print_string_function(&print_null);
 
 #ifdef CV_OMP
@@ -2943,6 +2864,30 @@ int save_model(const char *model_file_name, const struct model *model_)
 	else return 0;
 }
 
+//
+// FSCANF helps to handle fscanf failures.
+// Its do-while block avoids the ambiguity when
+// if (...)
+//    FSCANF();
+// is used
+//
+#define FSCANF(_stream, _format, _var)do\
+{\
+	if (fscanf(_stream, _format, _var) != 1)\
+	{\
+		fprintf(stderr, "ERROR: fscanf failed to read the model\n");\
+		EXIT_LOAD_MODEL()\
+	}\
+}while(0)
+// EXIT_LOAD_MODEL should NOT end with a semicolon.
+#define EXIT_LOAD_MODEL()\
+{\
+	setlocale(LC_ALL, old_locale);\
+	free(model_->label);\
+	free(model_);\
+	free(old_locale);\
+	return NULL;\
+}
 struct model *load_model(const char *model_file_name)
 {
 	FILE *fp = fopen(model_file_name,"r");
@@ -2968,10 +2913,10 @@ struct model *load_model(const char *model_file_name)
 	char cmd[81];
 	while(1)
 	{
-		fscanf(fp,"%80s",cmd);
+		FSCANF(fp,"%80s",cmd);
 		if(strcmp(cmd,"solver_type")==0)
 		{
-			fscanf(fp,"%80s",cmd);
+			FSCANF(fp,"%80s",cmd);
 			int i;
 			for(i=0;solver_type_table[i];i++)
 			{
@@ -2984,27 +2929,22 @@ struct model *load_model(const char *model_file_name)
 			if(solver_type_table[i] == NULL)
 			{
 				fprintf(stderr,"unknown solver type.\n");
-
-				setlocale(LC_ALL, old_locale);
-				free(model_->label);
-				free(model_);
-				free(old_locale);
-				return NULL;
+				EXIT_LOAD_MODEL()
 			}
 		}
 		else if(strcmp(cmd,"nr_class")==0)
 		{
-			fscanf(fp,"%d",&nr_class);
+			FSCANF(fp,"%d",&nr_class);
 			model_->nr_class=nr_class;
 		}
 		else if(strcmp(cmd,"nr_feature")==0)
 		{
-			fscanf(fp,"%d",&nr_feature);
+			FSCANF(fp,"%d",&nr_feature);
 			model_->nr_feature=nr_feature;
 		}
 		else if(strcmp(cmd,"bias")==0)
 		{
-			fscanf(fp,"%lf",&bias);
+			FSCANF(fp,"%lf",&bias);
 			model_->bias=bias;
 		}
 		else if(strcmp(cmd,"w")==0)
@@ -3016,16 +2956,12 @@ struct model *load_model(const char *model_file_name)
 			int nr_class = model_->nr_class;
 			model_->label = Malloc(int,nr_class);
 			for(int i=0;i<nr_class;i++)
-				fscanf(fp,"%d",&model_->label[i]);
+				FSCANF(fp,"%d",&model_->label[i]);
 		}
 		else
 		{
 			fprintf(stderr,"unknown text in model file: [%s]\n",cmd);
-			setlocale(LC_ALL, old_locale);
-			free(model_->label);
-			free(model_);
-			free(old_locale);
-			return NULL;
+			EXIT_LOAD_MODEL()
 		}
 	}
 
@@ -3046,8 +2982,12 @@ struct model *load_model(const char *model_file_name)
 	{
 		int j;
 		for(j=0; j<nr_w; j++)
-			fscanf(fp, "%lf ", &model_->w[i*nr_w+j]);
-		fscanf(fp, "\n");
+			FSCANF(fp, "%lf ", &model_->w[i*nr_w+j]);
+		if (fscanf(fp, "\n") !=0)
+		{
+			fprintf(stderr, "ERROR: fscanf failed to read the model\n");
+			EXIT_LOAD_MODEL()
+		}
 	}
 
 	setlocale(LC_ALL, old_locale);
