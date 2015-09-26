@@ -7,6 +7,8 @@
 #include "linear.h"
 #include "tron.h"
 #include <omp.h>
+#include <random>
+#include <chrono>
 typedef signed char schar;
 template <class T> static inline void swap(T& x, T& y) { T t=x; x=y; y=t; }
 #ifndef min
@@ -45,6 +47,15 @@ static void info(const char *fmt,...)
 #else
 static void info(const char *fmt,...) {}
 #endif
+
+static inline int rand_int(const int max)
+{
+	static thread_local auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+	static thread_local std::mt19937 rng(seed);
+	std::uniform_int_distribution<int> dist(0, max-1);
+	return dist(rng);
+}
+
 class sparse_operator
 {
 public:
@@ -670,7 +681,7 @@ void Solver_MCSVM_CS::Solve(double *w)
 		double stopping = -INF;
 		for(i=0;i<active_size;i++)
 		{
-			int j = i+rand()%(active_size-i);
+			int j = i+rand_int(active_size-i);
 			swap(index[i], index[j]);
 		}
 		for(s=0;s<active_size;s++)
@@ -928,7 +939,7 @@ static void solve_l2r_l1l2_svc(
 
 		for (i=0; i<active_size; i++)
 		{
-			int j = i+rand()%(active_size-i);
+			int j = i+rand_int(active_size-i);
 			swap(index[i], index[j]);
 		}
 
@@ -1119,7 +1130,7 @@ static void solve_l2r_l1l2_svr(
 
 		for(i=0; i<active_size; i++)
 		{
-			int j = i+rand()%(active_size-i);
+			int j = i+rand_int(active_size-i);
 			swap(index[i], index[j]);
 		}
 
@@ -1320,7 +1331,7 @@ void solve_l2r_lr_dual(const problem *prob, double *w, double eps, double Cp, do
 	{
 		for (i=0; i<l; i++)
 		{
-			int j = i+rand()%(l-i);
+			int j = i+rand_int(l-i);
 			swap(index[i], index[j]);
 		}
 		int newton_iter = 0;
@@ -1491,7 +1502,7 @@ static void solve_l1r_l2_svc(
 
 		for(j=0; j<active_size; j++)
 		{
-			int i = j+rand()%(active_size-j);
+			int i = j+rand_int(active_size-j);
 			swap(index[i], index[j]);
 		}
 
@@ -1858,7 +1869,7 @@ static void solve_l1r_lr(
 
 			for(j=0; j<QP_active_size; j++)
 			{
-				int i = j+rand()%(QP_active_size-j);
+				int i = j+rand_int(QP_active_size-j);
 				swap(index[i], index[j]);
 			}
 
@@ -2506,7 +2517,7 @@ void cross_validation(const problem *prob, const parameter *param, int nr_fold, 
 	for(i=0;i<l;i++) perm[i]=i;
 	for(i=0;i<l;i++)
 	{
-		int j = i+rand()%(l-i);
+		int j = i+rand_int(l-i);
 		swap(perm[i],perm[j]);
 	}
 	for(i=0;i<=nr_fold;i++)
@@ -2580,7 +2591,7 @@ void find_parameter_C(const problem *prob, const parameter *param, int nr_fold, 
 	for(i=0;i<l;i++) perm[i]=i;
 	for(i=0;i<l;i++)
 	{
-		int j = i+rand()%(l-i);
+		int j = i+rand_int(l-i);
 		swap(perm[i],perm[j]);
 	}
 	for(i=0;i<=nr_fold;i++)
