@@ -343,11 +343,21 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 #ifdef CV_OMP
 		omp_set_nested(1);
 		omp_set_num_threads(nr_fold);
-		printf("Total threads used: %d\n", nr_fold*param.nr_thread);
+		if(nr_fold*param.nr_thread > omp_get_max_threads())
+			fprintf(stderr, "The number of threads exceeds maxminum limit\n");
+		else
+			printf("Total threads used: %d\n", nr_fold*param.nr_thread);
 #else
 		printf("Total threads used: %d\n", param.nr_thread);
 #endif
 	}
+#ifdef CV_OMP
+	else
+	{
+		omp_set_num_threads(nr_fold);
+		printf("Total threads used: %d\n", nr_fold);
+	}
+#endif
 
 	if(param.eps == INF)
 	{
