@@ -1,8 +1,7 @@
 CXX ?= g++
 CC ?= gcc
 CFLAGS = -Wall -Wconversion -O3 -fPIC -fopenmp
-CXXFLAGS = -Wall -Wconversion -O3 -fPIC -fopenmp -std=c++11
-# CXXFLAGS += -DCV_OMP
+# CFLAGS += -DCV_OMP
 LIBS = blas/blas.a
 SHVER = 3
 OS = $(shell uname)
@@ -19,16 +18,16 @@ lib: linear.o tron.o blas/blas.a
 	$(CXX) -fopenmp $${SHARED_LIB_FLAG} linear.o tron.o blas/blas.a -o liblinear.so.$(SHVER)
 
 train: tron.o linear.o train.c blas/blas.a
-	$(CXX) $(CXXFLAGS) -o train train.c tron.o linear.o $(LIBS)
+	$(CXX) $(CFLAGS) -o train train.c tron.o linear.o $(LIBS)
 
 predict: tron.o linear.o predict.c blas/blas.a
-	$(CXX) $(CXXFLAGS) -o predict predict.c tron.o linear.o $(LIBS)
+	$(CXX) $(CFLAGS) -o predict predict.c tron.o linear.o $(LIBS)
 
 tron.o: tron.cpp tron.h
-	$(CXX) $(CXXFLAGS) -c -o tron.o tron.cpp
+	$(CXX) $(CFLAGS) -c -o tron.o tron.cpp
 
 linear.o: linear.cpp linear.h
-	$(CXX) $(CXXFLAGS) -c -o linear.o linear.cpp
+	$(CXX) $(CFLAGS) -c -o linear.o linear.cpp
 
 blas/blas.a: blas/*.c blas/*.h
 	make -C blas OPTFLAGS='$(CFLAGS)' CC='$(CC)';

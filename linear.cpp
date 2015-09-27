@@ -7,8 +7,7 @@
 #include "linear.h"
 #include "tron.h"
 #include <omp.h>
-#include <random>
-#include <chrono>
+#include <time.h>
 typedef signed char schar;
 template <class T> static inline void swap(T& x, T& y) { T t=x; x=y; y=t; }
 #ifndef min
@@ -50,10 +49,10 @@ static void info(const char *fmt,...) {}
 
 static inline int rand_int(const int max)
 {
-	static thread_local auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-	static thread_local std::mt19937 rng(seed);
-	std::uniform_int_distribution<int> dist(0, max-1);
-	return dist(rng);
+	static int seed = (int)clock()+omp_get_thread_num();
+#pragma omp threadprivate(seed)
+	seed = ((seed * 1103515245) + 12345) & 0x7fffffff;
+	return seed%max;
 }
 
 class sparse_operator
