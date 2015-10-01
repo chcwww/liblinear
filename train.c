@@ -326,7 +326,7 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 			exit_with_help();
 		}
 	}
-	
+
 	//default solver for parallel execution is L2R_L2LOSS_SVC
 	if(flag_omp)
 	{
@@ -340,24 +340,24 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 			fprintf(stderr, "Parallel LIBLINEAR is only available for -s 0, 2, 11 now\n");
 			exit_with_help();
 		}
-#ifdef CV_OMP
-		omp_set_nested(1);
-		if(nr_fold*param.nr_thread > omp_get_num_procs())
-			fprintf(stderr, "The number of threads exceeds maxminum limit\n");
-		else
-		{
-			omp_set_num_threads(nr_fold);
-			printf("Total threads used: %d\n", nr_fold*param.nr_thread);
-		}
-#else
+#ifndef CV_OMP
 		printf("Total threads used: %d\n", param.nr_thread);
 #endif
 	}
 #ifdef CV_OMP
-	else
+	if(flag_cross_validation)
 	{
-		omp_set_num_threads(nr_fold);
-		printf("Total threads used: %d\n", nr_fold);
+		int cvthreads = nr_fold;
+		int maxthreads = omp_get_num_procs();
+		if(flag_omp)
+		{
+			omp_set_nested(1);
+			maxthreads = omp_get_num_procs()/param.nr_thread;
+		}
+		if(cvthreads > maxthreads)
+			cvthreads = maxthreads;
+		omp_set_num_threads(cvthreads);
+		printf("Total threads used: %d\n", cvthreads*param.nr_thread);
 	}
 #endif
 

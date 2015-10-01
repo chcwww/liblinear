@@ -279,24 +279,24 @@ int parse_command_line(int nrhs, const mxArray *prhs[], char *model_file_name)
 			mexPrintf("Parallel LIBLINEAR is only available for -s 0, 2, 11 now.\n");
 			return 1;
 		}
-#ifdef CV_OMP
-		omp_set_nested(1);
-		if(nr_fold*param.nr_thread > omp_get_num_procs())
-			mexPrintf("The number of threads exceeds maximum limit\n");
-		else
-		{
-			omp_set_num_threads(nr_fold);
-			mexPrintf("Total threads used: %d\n", nr_fold*param.nr_thread);
-		}
-#else
+#ifndef CV_OMP
 		mexPrintf("Total threads used: %d\n", param.nr_thread);
 #endif
 	}
 #ifdef CV_OMP
-	else
+	if(flag_cross_validation)
 	{
-		omp_set_num_threads(nr_fold);
-		mexPrintf("Total threads used: %d\n", nr_fold);
+		int cvthreads = nr_fold;
+		int maxthreads = omp_get_num_procs();
+		if(flag_omp)
+		{
+			omp_set_nested(1);
+			maxthreads = omp_get_num_procs()/param.nr_thread;
+		}
+		if(cvthreads > maxthreads)
+			cvthreads = maxthreads;
+		omp_set_num_threads(cvthreads);
+		mexPrintf("Total threads used: %d\n", cvthreads*param.nr_thread);
 	}
 #endif
 
