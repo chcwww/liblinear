@@ -57,7 +57,8 @@ epsilon_normalized     28.766     18.202      17.282
 rcv1_test.binary        2.910      1.736       1.466
 webspam(trigram)       41.6925    21.883      16.794
 
-Note that the results are not comparable, since they solve different problems.
+Note that the primal and dual results are not comparable because they
+solve different problems.
 
 Reference
 =========
