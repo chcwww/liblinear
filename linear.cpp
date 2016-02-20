@@ -7,7 +7,6 @@
 #include "linear.h"
 #include "tron.h"
 #include <omp.h>
-#include <time.h>
 typedef signed char schar;
 template <class T> static inline void swap(T& x, T& y) { T t=x; x=y; y=t; }
 #ifndef min
@@ -49,7 +48,7 @@ static void info(const char *fmt,...) {}
 
 static inline int rand_int(const int max)
 {
-	static int seed = (int)clock()+omp_get_thread_num();
+	static int seed = omp_get_thread_num();
 #ifdef CV_OMP
 #pragma omp threadprivate(seed)
 #endif
@@ -878,7 +877,7 @@ static void solve_l2r_l1l2_svc(
 	int l = prob->l;
 	int w_size = prob->n;
 	int i, s, iter = 0;
-	double C, d, G;
+	double C, d;
 	double *QD = new double[l];
 	int max_iter = 1000;
 	int *index = new int[l];
@@ -891,6 +890,16 @@ static void solve_l2r_l1l2_svc(
 	double PGmax_old = INF;
 	double PGmin_old = -INF;
 	double PGmax_new, PGmin_new;
+
+	// for multi-core dual CD
+	// candidates: a block considered for gradient evaluation
+	// workingset: a subset of candidates for sequential CD updates
+	double eps1 = 0.1;
+	int init_candidates_size = 256;
+	int max_candidates_size = 4096;
+	int candidates_size = min(init_candidates_size, max_candidates_size);
+	double *Grad = new double[max_candidates_size];
+	int *workingset = new int[max_candidates_size];
 
 	// default solver_type: L2R_L2LOSS_SVC_DUAL
 	double diag[3] = {0.5/Cn, 0, 0.5/Cp};
@@ -937,81 +946,141 @@ static void solve_l2r_l1l2_svc(
 	{
 		PGmax_new = -INF;
 		PGmin_new = INF;
+		int t = 0;
+		int num_updates_one_iter = 0;
 
 		for (i=0; i<active_size; i++)
 		{
 			int j = i+rand_int(active_size-i);
 			swap(index[i], index[j]);
 		}
-
-		for (s=0; s<active_size; s++)
+		while (t < active_size)
 		{
-			i = index[s];
-			const schar yi = y[i];
-			feature_node * const xi = prob->x[i];
+			int send = min(candidates_size, active_size-t);
 
-			G = yi*sparse_operator::dot(w, xi)-1;
-
-			C = upper_bound[GETI(i)];
-			G += alpha[i]*diag[GETI(i)];
-
-			PG = 0;
-			if (alpha[i] == 0)
+#pragma omp parallel for private(s,i) schedule(static)
+			for (s=0; s<send; s++)
 			{
-				if (G > PGmax_old)
+				i = index[t+s];
+				Grad[s] = y[i]*sparse_operator::dot(w, prob->x[i])-1 + alpha[i]*diag[GETI(i)];
+			}
+
+			int workingset_size = 0;
+
+			for (s=0; s<send; s++)
+			{
+				PG = 0;
+				i = index[t+s];
+				C = upper_bound[GETI(i)];
+				if (alpha[i] == 0)
 				{
-					active_size--;
-					swap(index[s], index[active_size]);
-					s--;
-					continue;
+					if (Grad[s] > PGmax_old)
+					{
+						active_size--;
+						send--;
+						if (t+send == active_size)
+							swap(index[t+s], index[t+send]);
+						else
+						{
+							int r = index[active_size];
+							index[active_size] = index[t+s];
+							index[t+s] = index[t+send];
+							index[t+send] = r;
+						}
+						Grad[s] = Grad[send];
+						s--;
+						continue;
+					}
+					else if (Grad[s] < 0)
+						PG = Grad[s];
 				}
-				else if (G < 0)
-					PG = G;
-			}
-			else if (alpha[i] == C)
-			{
-				if (G < PGmin_old)
+				else if (alpha[i] == C)
 				{
-					active_size--;
-					swap(index[s], index[active_size]);
-					s--;
-					continue;
+					if (Grad[s] < PGmin_old)
+					{
+						active_size--;
+						send--;
+						if (t+send == active_size)
+							swap(index[t+s], index[t+send]);
+						else
+						{
+							int r = index[active_size];
+							index[active_size] = index[t+s];
+							index[t+s] = index[t+send];
+							index[t+send] = r;
+						}
+						Grad[s] = Grad[send];
+						s--;
+						continue;
+					}
+					else if (Grad[s] > 0)
+						PG = Grad[s];
 				}
-				else if (G > 0)
-					PG = G;
+				else
+					PG = Grad[s];
+
+				PGmax_new = max(PGmax_new, PG);
+				PGmin_new = min(PGmin_new, PG);
+
+				if (fabs(PG) >= 0.1*eps1)
+				{
+					workingset[workingset_size] = i;
+					workingset_size++;
+				}
 			}
-			else
-				PG = G;
 
-			PGmax_new = max(PGmax_new, PG);
-			PGmin_new = min(PGmin_new, PG);
+			if (workingset_size == 0)
+				candidates_size = min((int)(candidates_size*1.5), max_candidates_size);
+			else if (workingset_size >= init_candidates_size)
+				candidates_size = candidates_size/2;
 
-			if(fabs(PG) > 1.0e-12)
+			for (s=0; s<workingset_size; s++)
 			{
-				double alpha_old = alpha[i];
-				alpha[i] = min(max(alpha[i] - G/QD[i], 0.0), C);
-				d = (alpha[i] - alpha_old)*yi;
-				sparse_operator::axpy(d, xi, w);
+				i = workingset[s];
+
+				const schar yi = y[i];
+				feature_node * const xi = prob->x[i];
+
+				double G = yi*sparse_operator::dot(w, xi)-1;
+
+				C = upper_bound[GETI(i)];
+				G += alpha[i]*diag[GETI(i)];
+
+				double alpha_new = min(max(alpha[i] - G/QD[i], 0.0), C);
+				d = alpha_new - alpha[i];
+				if (fabs(d) > 1.0e-15)
+				{
+					alpha[i] = alpha_new;
+					sparse_operator::axpy(d*yi, xi, w);
+					num_updates_one_iter++;
+				}
 			}
+			t = t + send;
 		}
 
 		iter++;
 		if(iter % 10 == 0)
 			info(".");
 
-		if(PGmax_new - PGmin_new <= eps)
+		if(PGmax_new - PGmin_new <= eps1 || num_updates_one_iter == 0)
 		{
 			if(active_size == l)
-				break;
+			{
+				if (eps1 <= eps+1e-12)
+					break;
+			}
 			else
 			{
 				active_size = l;
 				info("*");
 				PGmax_old = INF;
 				PGmin_old = -INF;
+
+				eps1 = max(0.1*eps1, eps);
 				continue;
 			}
 		}
+
 		PGmax_old = PGmax_new;
 		PGmin_old = PGmin_new;
 		if (PGmax_old <= 0)
@@ -1043,6 +1112,8 @@ static void solve_l2r_l1l2_svc(
 	delete [] alpha;
 	delete [] y;
 	delete [] index;
+	delete [] Grad;
+	delete [] workingset;
 }
 
 
