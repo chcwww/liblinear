@@ -33,7 +33,7 @@ parallel. The major changes for the dual solver are to calculate the gradients
 in parallel, and then do CD (coordinate descent) updates serially.
 Details could be seen in the references.
 
-Experiment Results
+Experiment Results (training time only)
 ==================
 
 Primal Logistic Regression:
@@ -45,17 +45,17 @@ webspam(trigram)      509.456    185.467     117.229
 
 Dual l1-loss SVM:
 dataset              1-thread  4-threads   8-threads
-covtype_scale           4.624      2.935       2.330
-epsilon_normalized     19.951      8.444       7.514
-rcv1_test.binary        2.369      1.071       0.856
-webspam(trigram)       64.064     24.065      17.216
+covtype_scale           3.420      2.261       2.150
+epsilon_normalized     18.945      9.702       8.914
+rcv1_test.binary        2.553      1.319       1.091
+webspam(trigram)       60.986     28.901      22.843
 
 Dual l2-loss SVM:
 dataset              1-thread  4-threads   8-threads
-covtype_scale           7.736      5.355       5.193
-epsilon_normalized     28.766     18.202      17.282
-rcv1_test.binary        2.910      1.736       1.466
-webspam(trigram)       41.6925    21.883      16.794
+covtype_scale           7.508      5.090       4.771
+epsilon_normalized     31.164     20.434      19.691
+rcv1_test.binary        3.146      1.982       1.804
+webspam(trigram)       47.472     26.726      22.812
 
 Note that the primal and dual results are not comparable because they
 solve different problems.
