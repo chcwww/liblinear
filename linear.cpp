@@ -895,6 +895,7 @@ static void solve_l2r_l1l2_svc(
 	// candidates: a block considered for gradient evaluation
 	// workingset: a subset of candidates for sequential CD updates
 	double eps1 = 0.1;
+	double min_eps1 = min(0.01*eps, eps1);
 	int init_candidates_size = 256;
 	int max_candidates_size = 4096;
 	int candidates_size = min(init_candidates_size, max_candidates_size);
@@ -1062,21 +1063,36 @@ static void solve_l2r_l1l2_svc(
 		if(iter % 10 == 0)
 			info(".");
 
-		if(PGmax_new - PGmin_new <= eps1 || num_updates_one_iter == 0)
+		// reset active set and decrease eps1
+		if(num_updates_one_iter == 0)
+		{
+			if(active_size == l && eps1 <= eps)
+				break;
+
+			eps1 = max(0.1*eps1, min_eps1);
+
+			active_size = l;
+			info("*");
+			PGmax_old = INF;
+			PGmin_old = -INF;
+			continue;
+		}
+
+		if(PGmax_new - PGmin_new <= eps1)
+			eps1 = max(0.1*eps1, min_eps1);
+
+		if(PGmax_new - PGmin_new <= eps)
 		{
 			if(active_size == l)
-			{
-				if (eps1 <= eps+1e-12)
-					break;
-			}
-			else
+				break;
+
+			// use a stricter criteria for resetting active set
+			if(PGmax_new - PGmin_new <= 0.9*eps || active_size >= 0.05*l)
 			{
 				active_size = l;
 				info("*");
 				PGmax_old = INF;
 				PGmin_old = -INF;
-
-				eps1 = max(0.1*eps1, eps);
 				continue;
 			}
 		}
