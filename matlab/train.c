@@ -61,7 +61,7 @@ void exit_with_help()
 	"-wi weight: weights adjust the parameter C of different classes (see README for details)\n"
 	"-v n: n-fold cross validation mode\n"
 	"-C : find parameter C (only for -s 0 and 2)\n"
-	"-n nr_thread : parallel version with [nr_thread] threads (default 1; only for -s 0, 2, 11)\n"
+	"-n nr_thread : parallel version with [nr_thread] threads (default 2; only for -s 0, 1, 2, 3, 11)\n"
 	"-q : quiet mode (no outputs)\n"
 	"col:\n"
 	"	if 'col' is setted, training_instance_matrix is parsed in column format, otherwise is in row format\n"
@@ -274,9 +274,13 @@ int parse_command_line(int nrhs, const mxArray *prhs[], char *model_file_name)
 			mexPrintf("Solver not specified. Using -s 2\n");
 			param.solver_type = L2R_L2LOSS_SVC;
 		}
-		else if(param.solver_type != L2R_LR && param.solver_type != L2R_L2LOSS_SVC && param.solver_type != L2R_L2LOSS_SVR)
+		else if(param.solver_type != L2R_LR &&
+				param.solver_type != L2R_L2LOSS_SVC &&
+				param.solver_type != L2R_L2LOSS_SVR &&
+				param.solver_type != L2R_L1LOSS_SVC_DUAL &&
+				param.solver_type != L2R_L2LOSS_SVC_DUAL)
 		{
-			mexPrintf("Parallel LIBLINEAR is only available for -s 0, 2, 11 now.\n");
+			mexPrintf("Parallel LIBLINEAR is only available for -s 0, 1, 2, 3, 11 now.\n");
 			return 1;
 		}
 #ifndef CV_OMP
