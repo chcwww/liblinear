@@ -205,9 +205,11 @@ double l2r_lr_fun::fun(double *w)
 
 	Xv(w, z);
 
+#pragma omp parallel for private(i) reduction(+:f) schedule(static)
 	for(i=0;i<w_size;i++)
 		f += w[i]*w[i];
 	f /= 2.0;
+#pragma omp parallel for private(i) reduction(+:f) schedule(static)
 	for(i=0;i<l;i++)
 	{
 		double yz = y[i]*z[i];
@@ -227,6 +229,7 @@ void l2r_lr_fun::grad(double *w, double *g)
 	int l=prob->l;
 	int w_size=get_nr_variable();
 
+#pragma omp parallel for private(i) schedule(static)
 	for(i=0;i<l;i++)
 	{
 		z[i] = 1/(1 + exp(-y[i]*z[i]));
@@ -235,6 +238,7 @@ void l2r_lr_fun::grad(double *w, double *g)
 	}
 	XTv(z, g);
 
+#pragma omp parallel for private(i) schedule(static)
 	for(i=0;i<w_size;i++)
 		g[i] = w[i] + g[i];
 }
@@ -266,6 +270,7 @@ void l2r_lr_fun::Hv(double *s, double *Hs)
 	}
 
 	reduce_vectors->reduce_sum(Hs);
+#pragma omp parallel for private(i) schedule(static)
 	for(i=0;i<w_size;i++)
 		Hs[i] = s[i] + Hs[i];
 	delete[] wa;
@@ -356,9 +361,11 @@ double l2r_l2_svc_fun::fun(double *w)
 
 	Xv(w, z);
 
+#pragma omp parallel for private(i) reduction(+:f) schedule(static)
 	for(i=0;i<w_size;i++)
 		f += w[i]*w[i];
 	f /= 2.0;
+#pragma omp parallel for private(i) reduction(+:f) schedule(static)
 	for(i=0;i<l;i++)
 	{
 		z[i] = y[i]*z[i];
@@ -387,6 +394,7 @@ void l2r_l2_svc_fun::grad(double *w, double *g)
 		}
 	subXTv(z, g);
 
+#pragma omp parallel for private(i) schedule(static)
 	for(i=0;i<w_size;i++)
 		g[i] = w[i] + 2*g[i];
 }
@@ -417,6 +425,7 @@ void l2r_l2_svc_fun::Hv(double *s, double *Hs)
 	}
 	
 	reduce_vectors->reduce_sum(Hs);
+#pragma omp parallel for private(i) schedule(static)
 	for(i=0;i<w_size;i++)
 		Hs[i] = s[i] + 2*Hs[i];
 	delete[] wa;
@@ -476,9 +485,11 @@ double l2r_l2_svr_fun::fun(double *w)
 
 	Xv(w, z);
 
+#pragma omp parallel for private(i) reduction(+:f) schedule(static)
 	for(i=0;i<w_size;i++)
 		f += w[i]*w[i];
 	f /= 2;
+#pragma omp parallel for private(i) reduction(+:f) schedule(static)
 	for(i=0;i<l;i++)
 	{
 		d = z[i] - y[i];
@@ -521,6 +532,7 @@ void l2r_l2_svr_fun::grad(double *w, double *g)
 	}
 	subXTv(z, g);
 
+#pragma omp parallel for private(i) schedule(static)
 	for(i=0;i<w_size;i++)
 		g[i] = w[i] + 2*g[i];
 }
