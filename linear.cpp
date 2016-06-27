@@ -985,53 +985,27 @@ static void solve_l2r_l1l2_svc(
 				PG = 0;
 				i = index[t+s];
 				C = upper_bound[GETI(i)];
-				if (alpha[i] == 0)
-				{
-					if (Grad[s] > PGmax_old)
-					{
-						active_size--;
-						send--;
-						if (t+send == active_size)
-							swap(index[t+s], index[t+send]);
-						else
-						{
-							int r = index[active_size];
-							index[active_size] = index[t+s];
-							index[t+s] = index[t+send];
-							index[t+send] = r;
-						}
-						Grad[s] = Grad[send];
-						s--;
-						continue;
-					}
-					else if (Grad[s] < 0)
-						PG = Grad[s];
-				}
-				else if (alpha[i] == C)
-				{
-					if (Grad[s] < PGmin_old)
-					{
-						active_size--;
-						send--;
-						if (t+send == active_size)
-							swap(index[t+s], index[t+send]);
-						else
-						{
-							int r = index[active_size];
-							index[active_size] = index[t+s];
-							index[t+s] = index[t+send];
-							index[t+send] = r;
-						}
-						Grad[s] = Grad[send];
-						s--;
-						continue;
-					}
-					else if (Grad[s] > 0)
-						PG = Grad[s];
-				}
-				else
+				if ((alpha[i] < C && Grad[s] < 0) ||
+					(alpha[i] > 0 && Grad[s] > 0))
 					PG = Grad[s];
-
+				else if ((alpha[i] == 0 && Grad[s] > PGmax_old) ||
+						 (alpha[i] == C && Grad[s] < PGmin_old))
+				{
+					active_size--;
+					send--;
+					if (t+send == active_size)
+						swap(index[t+s], index[t+send]);
+					else
+					{
+						int r = index[active_size];
+						index[active_size] = index[t+s];
+						index[t+s] = index[t+send];
+						index[t+send] = r;
+					}
+					Grad[s] = Grad[send];
+					s--;
+					continue;
+				}
 				PGmax_new = max(PGmax_new, PG);
 				PGmin_new = min(PGmin_new, PG);
 
