@@ -38,10 +38,10 @@ Experiment Results (training time only)
 
 Primal Logistic Regression:
 dataset              1-thread  4-threads   8-threads
-covtype_scale           1.824      0.718       0.684
-epsilon_normalized    111.906     29.958      17.920
-rcv1_test.binary       15.157      4.218       2.507
-webspam(trigram)      509.456    185.467     117.229
+covtype_scale           1.837      0.491       0.393
+epsilon_normalized    114.495     30.030      18.200
+rcv1_test.binary       15.118      3.978       2.187
+webspam(trigram)      519.574    184.922     116.896
 
 Dual l1-loss SVM:
 dataset              1-thread  4-threads   8-threads
