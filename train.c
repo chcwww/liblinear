@@ -336,10 +336,10 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 			param.solver_type = L2R_L2LOSS_SVC;
 		}
 		else if(param.solver_type != L2R_LR &&
-				param.solver_type != L2R_L2LOSS_SVC &&
-				param.solver_type != L2R_L2LOSS_SVR &&
-				param.solver_type != L2R_L1LOSS_SVC_DUAL &&
-				param.solver_type != L2R_L2LOSS_SVC_DUAL)
+			param.solver_type != L2R_L2LOSS_SVC &&
+			param.solver_type != L2R_L2LOSS_SVR &&
+			param.solver_type != L2R_L1LOSS_SVC_DUAL &&
+			param.solver_type != L2R_L2LOSS_SVC_DUAL)
 		{
 			fprintf(stderr, "Parallel LIBLINEAR is only available for -s 0, 1, 2, 3, 11 now\n");
 			exit_with_help();
