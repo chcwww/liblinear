@@ -985,6 +985,12 @@ static void solve_l2r_l1l2_svc(
 				PG = 0;
 				i = index[t+s];
 				C = upper_bound[GETI(i)];
+
+				// A cleaner if-else statement is used here for calculating projected gradient.
+				// We do not consider it in single-thread cddual due to slightly slower training
+				// in some data sets (e.g., 5% for covtype). The reasons are that more
+				// conditions are checked here and the computation within the if-else statement
+				// is lighter in single-thread cddual
 				if ((alpha[i] < C && Grad[s] < 0) ||
 					(alpha[i] > 0 && Grad[s] > 0))
 					PG = Grad[s];
