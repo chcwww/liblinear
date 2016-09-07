@@ -253,7 +253,6 @@ void l2r_lr_fun::Hv(double *s, double *Hs)
 	int i;
 	int l=prob->l;
 	int w_size=get_nr_variable();
-	double *wa = new double[l];
 	feature_node **x=prob->x;
 
 	reduce_vectors->init();
@@ -262,18 +261,17 @@ void l2r_lr_fun::Hv(double *s, double *Hs)
 	for(i=0;i<l;i++)
 	{
 		feature_node * const xi=x[i];
-		wa[i] = sparse_operator::dot(s, xi);
-		
-		wa[i] = C[i]*D[i]*wa[i];
+		double xTs = sparse_operator::dot(s, xi);
 
-		reduce_vectors->sum_scale_x(wa[i], xi);
+		xTs = C[i]*D[i]*xTs;
+
+		reduce_vectors->sum_scale_x(xTs, xi);
 	}
 
 	reduce_vectors->reduce_sum(Hs);
 #pragma omp parallel for private(i) schedule(static)
 	for(i=0;i<w_size;i++)
 		Hs[i] = s[i] + Hs[i];
-	delete[] wa;
 }
 
 void l2r_lr_fun::Xv(double *v, double *Xv)
@@ -320,7 +318,6 @@ protected:
 
 	double *C;
 	double *z;
-	double *D;
 	Reduce_Vectors *reduce_vectors;
 
 	int *I;
@@ -335,7 +332,6 @@ l2r_l2_svc_fun::l2r_l2_svc_fun(const problem *prob, double *C)
 	this->prob = prob;
 
 	z = new double[l];
-	D = new double[l];
 
 	reduce_vectors = new Reduce_Vectors(get_nr_variable());
 
@@ -346,7 +342,6 @@ l2r_l2_svc_fun::l2r_l2_svc_fun(const problem *prob, double *C)
 l2r_l2_svc_fun::~l2r_l2_svc_fun()
 {
 	delete[] z;
-	delete[] D;
 	delete[] I;
 	delete reduce_vectors;
 }
@@ -408,7 +403,6 @@ void l2r_l2_svc_fun::Hv(double *s, double *Hs)
 {
 	int i;
 	int w_size=get_nr_variable();
-	double *wa = new double[sizeI];
 	feature_node **x=prob->x;
 
 	reduce_vectors->init();
@@ -417,18 +411,17 @@ void l2r_l2_svc_fun::Hv(double *s, double *Hs)
 	for(i=0;i<sizeI;i++)
 	{
 		feature_node * const xi=x[I[i]];
-		wa[i] = sparse_operator::dot(s, xi);
+		double xTs = sparse_operator::dot(s, xi);
 
-		wa[i] = C[I[i]]*wa[i];
+		xTs = C[I[i]]*xTs;
 
-		reduce_vectors->sum_scale_x(wa[i], xi);
+		reduce_vectors->sum_scale_x(xTs, xi);
 	}
 	
 	reduce_vectors->reduce_sum(Hs);
 #pragma omp parallel for private(i) schedule(static)
 	for(i=0;i<w_size;i++)
 		Hs[i] = s[i] + 2*Hs[i];
-	delete[] wa;
 }
 
 void l2r_l2_svc_fun::Xv(double *v, double *Xv)
@@ -537,19 +530,19 @@ void l2r_l2_svr_fun::grad(double *w, double *g)
 		g[i] = w[i] + 2*g[i];
 }
 
-// A coordinate descent algorithm for 
+// A coordinate descent algorithm for
 // multi-class support vector machines by Crammer and Singer
 //
 //  min_{\alpha}  0.5 \sum_m ||w_m(\alpha)||^2 + \sum_i \sum_m e^m_i alpha^m_i
 //    s.t.     \alpha^m_i <= C^m_i \forall m,i , \sum_m \alpha^m_i=0 \forall i
-// 
+//
 //  where e^m_i = 0 if y_i  = m,
 //        e^m_i = 1 if y_i != m,
-//  C^m_i = C if m  = y_i, 
-//  C^m_i = 0 if m != y_i, 
-//  and w_m(\alpha) = \sum_i \alpha^m_i x_i 
+//  C^m_i = C if m  = y_i,
+//  C^m_i = 0 if m != y_i,
+//  and w_m(\alpha) = \sum_i \alpha^m_i x_i
 //
-// Given: 
+// Given:
 // x, y, C
 // eps is the stopping tolerance
 //
@@ -657,7 +650,7 @@ void Solver_MCSVM_CS::Solve(double *w)
 	double eps_shrink = max(10.0*eps, 1.0); // stopping tolerance for shrinking
 	bool start_from_all = true;
 
-	// Initial alpha can be set here. Note that 
+	// Initial alpha can be set here. Note that
 	// sum_m alpha[i*nr_class+m] = 0, for all i=1,...,l-1
 	// alpha[i*nr_class+m] <= C[GETI(i)] if prob->y[i] == m
 	// alpha[i*nr_class+m] <= 0 if prob->y[i] != m
@@ -852,14 +845,14 @@ void Solver_MCSVM_CS::Solve(double *w)
 	delete [] active_size_i;
 }
 
-// A coordinate descent algorithm for 
+// A coordinate descent algorithm for
 // L1-loss and L2-loss SVM dual problems
 //
 //  min_\alpha  0.5(\alpha^T (Q + D)\alpha) - e^T \alpha,
 //    s.t.      0 <= \alpha_i <= upper_bound_i,
-// 
+//
 //  where Qij = yi yj xi^T xj and
-//  D is a diagonal matrix 
+//  D is a diagonal matrix
 //
 // In L1-SVM case:
 // 		upper_bound_i = Cp if y_i = 1
@@ -870,12 +863,12 @@ void Solver_MCSVM_CS::Solve(double *w)
 // 		D_ii = 1/(2*Cp)	if y_i = 1
 // 		D_ii = 1/(2*Cn)	if y_i = -1
 //
-// Given: 
+// Given:
 // x, y, Cp, Cn
 // eps is the stopping tolerance
 //
 // solution will be put in w
-// 
+//
 // See Algorithm 3 of Hsieh et al., ICML 2008
 
 #undef GETI
@@ -1125,14 +1118,14 @@ static void solve_l2r_l1l2_svc(
 }
 
 
-// A coordinate descent algorithm for 
+// A coordinate descent algorithm for
 // L1-loss and L2-loss epsilon-SVR dual problem
 //
 //  min_\beta  0.5\beta^T (Q + diag(lambda)) \beta - p \sum_{i=1}^l|\beta_i| + \sum_{i=1}^l yi\beta_i,
 //    s.t.      -upper_bound_i <= \beta_i <= upper_bound_i,
-// 
+//
 //  where Qij = xi^T xj and
-//  D is a diagonal matrix 
+//  D is a diagonal matrix
 //
 // In L1-SVM case:
 // 		upper_bound_i = C
@@ -1141,13 +1134,13 @@ static void solve_l2r_l1l2_svc(
 // 		upper_bound_i = INF
 // 		lambda_i = 1/(2*C)
 //
-// Given: 
+// Given:
 // x, y, p, C
 // eps is the stopping tolerance
 //
 // solution will be put in w
 //
-// See Algorithm 4 of Ho and Lin, 2012   
+// See Algorithm 4 of Ho and Lin, 2012
 
 #undef GETI
 #define GETI(i) (0)
@@ -1339,17 +1332,17 @@ static void solve_l2r_l1l2_svr(
 }
 
 
-// A coordinate descent algorithm for 
+// A coordinate descent algorithm for
 // the dual of L2-regularized logistic regression problems
 //
 //  min_\alpha  0.5(\alpha^T Q \alpha) + \sum \alpha_i log (\alpha_i) + (upper_bound_i - \alpha_i) log (upper_bound_i - \alpha_i),
 //    s.t.      0 <= \alpha_i <= upper_bound_i,
-// 
-//  where Qij = yi yj xi^T xj and 
+//
+//  where Qij = yi yj xi^T xj and
 //  upper_bound_i = Cp if y_i = 1
 //  upper_bound_i = Cn if y_i = -1
 //
-// Given: 
+// Given:
 // x, y, Cp, Cn
 // eps is the stopping tolerance
 //
@@ -1502,12 +1495,12 @@ void solve_l2r_lr_dual(const problem *prob, double *w, double eps, double Cp, do
 	delete [] index;
 }
 
-// A coordinate descent algorithm for 
+// A coordinate descent algorithm for
 // L1-regularized L2-loss support vector classification
 //
 //  min_w \sum |wj| + C \sum max(0, 1-yi w^T xi)^2,
 //
-// Given: 
+// Given:
 // x, y, Cp, Cn
 // eps is the stopping tolerance
 //
@@ -1781,12 +1774,12 @@ static void solve_l1r_l2_svc(
 	delete [] xj_sq;
 }
 
-// A coordinate descent algorithm for 
+// A coordinate descent algorithm for
 // L1-regularized logistic regression problems
 //
 //  min_w \sum |wj| + C \sum log(1+exp(-yi w^T xi)),
 //
-// Given: 
+// Given:
 // x, y, Cp, Cn
 // eps is the stopping tolerance
 //
@@ -2249,8 +2242,8 @@ static void group_classes(const problem *prob, int *nr_class_ret, int **label_re
 	}
 
 	//
-	// Labels are ordered by their first occurrence in the training set. 
-	// However, for two-class sets with -1/+1 labels and -1 appears first, 
+	// Labels are ordered by their first occurrence in the training set.
+	// However, for two-class sets with -1/+1 labels and -1 appears first,
 	// we swap labels to ensure that internally the binary SVM has positive data corresponding to the +1 instances.
 	//
 	if (nr_class == 2 && label[0] == -1 && label[1] == 1)
@@ -2526,7 +2519,7 @@ model* train(const problem *prob, const parameter *param)
 					sub_prob.y[k] = +1;
 				for(; k<sub_prob.l; k++)
 					sub_prob.y[k] = -1;
-				
+
 				if(param->init_sol != NULL)
 					for(i=0;i<w_size;i++)
 						model_->w[i] = param->init_sol[i];
@@ -2562,7 +2555,7 @@ model* train(const problem *prob, const parameter *param)
 
 					train_one(&sub_prob, param, w, weighted_C[i], param->C);
 
-					for(int j=0;j<w_size;j++)
+					for(j=0;j<w_size;j++)
 						model_->w[j*nr_class+i] = w[j];
 				}
 				free(w);
@@ -2784,7 +2777,7 @@ void find_parameter_C(const problem *prob, const parameter *param, int nr_fold, 
 		param1.C = param1.C*ratio;
 	}
 
-	if(param1.C > max_C && max_C > start_C) 
+	if(param1.C > max_C && max_C > start_C)
 		info("warning: maximum C reached.\n");
 	free(fold_start);
 	free(perm);
@@ -3107,7 +3100,7 @@ void get_labels(const model *model_, int* label)
 }
 
 // use inline here for better performance (around 20% faster than the non-inline one)
-static inline double get_w_value(const struct model *model_, int idx, int label_idx) 
+static inline double get_w_value(const struct model *model_, int idx, int label_idx)
 {
 	int nr_class = model_->nr_class;
 	int solver_type = model_->param.solver_type;
@@ -3117,7 +3110,7 @@ static inline double get_w_value(const struct model *model_, int idx, int label_
 		return 0;
 	if(check_regression_model(model_))
 		return w[idx];
-	else 
+	else
 	{
 		if(label_idx < 0 || label_idx >= nr_class)
 			return 0;
@@ -3205,7 +3198,7 @@ const char *check_parameter(const problem *prob, const parameter *param)
 		&& param->solver_type != L2R_L1LOSS_SVR_DUAL)
 		return "unknown solver type";
 
-	if(param->init_sol != NULL 
+	if(param->init_sol != NULL
 		&& param->solver_type != L2R_LR && param->solver_type != L2R_L2LOSS_SVC)
 		return "Initial-solution specification supported only for solver L2R_LR and L2R_L2LOSS_SVC";
 
