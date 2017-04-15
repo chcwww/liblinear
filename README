@@ -288,6 +288,11 @@ Output probability estimates (for logistic regression only).
 Library Usage
 =============
 
+These functions and structures are declared in the header file `linear.h'.
+You can see `train.c' and `predict.c' for examples showing how to use them.
+We define LIBLINEAR_VERSION and declare `extern int liblinear_version; '
+in linear.h, so you can check the version number.
+
 - Function: model* train(const struct problem *prob,
                 const struct parameter *param);
 
@@ -403,7 +408,8 @@ Library Usage
      nr_class and nr_feature are the number of classes and features,
      respectively. nr_class = 2 for regression.
 
-     The nr_feature*nr_class array w gives feature weights. We use one
+     The array w gives feature weights; its size is
+     nr_feature*nr_class but is nr_feature if nr_class = 2. We use one
      against the rest for multi-class classification, so each feature
      index corresponds to nr_class weight values. Weights are
      organized in the following way
