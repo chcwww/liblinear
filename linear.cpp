@@ -90,6 +90,16 @@ public:
 			x++;
 		}
 	}
+
+	static void axpy_omp(const double a, const feature_node *x, double *y, int nnz)
+	{
+#pragma omp parallel for schedule(static)
+        for(int k = 0; k < nnz; k++)
+        {
+            const feature_node *xk = x + k;
+			y[xk->index-1] += a*xk->value;
+        }
+	}
 };
 
 class Reduce_Vectors
@@ -1496,6 +1506,26 @@ void solve_l2r_lr_dual(const problem *prob, double *w, double eps, double Cp, do
 	delete [] index;
 }
 
+int* calc_nnz_per_feature(const problem *prob_col)
+{
+	int n = prob_col->n;
+	int *nnz_per_feature = new int[n];
+
+#pragma omp parallel
+	for(int j=0; j<n; j++)
+	{
+		nnz_per_feature[j] = 0;	
+		feature_node *x = prob_col->x[j];
+		while(x->index != -1)
+		{
+			nnz_per_feature[j]++;			
+			x++;
+		}
+	}
+
+	return nnz_per_feature;
+}
+
 // A coordinate descent algorithm for
 // L1-regularized L2-loss support vector classification
 //
@@ -1523,6 +1553,7 @@ static void solve_l1r_l2_svc(
 	int max_iter = 1000;
 	int active_size = w_size;
 	int max_num_linesearch = 20;
+	int omp_threshold = 500;
 
 	double sigma = 0.01;
 	double d, G_loss, G, H;
@@ -1540,6 +1571,8 @@ static void solve_l1r_l2_svc(
 	feature_node *x;
 
 	double C[3] = {Cn,0,Cp};
+
+	int *nnz_per_feature = calc_nnz_per_feature(prob_col);
 
 	// Initial w can be set here.
 	for(j=0; j<w_size; j++)
@@ -1587,17 +1620,36 @@ static void solve_l1r_l2_svc(
 			H = 0;
 
 			x = prob_col->x[j];
-			while(x->index != -1)
+			if(nnz_per_feature[j] < omp_threshold) 
 			{
-				int ind = x->index-1;
-				if(b[ind] > 0)
+				while(x->index != -1)
 				{
-					double val = x->value;
-					double tmp = C[GETI(ind)]*val;
-					G_loss -= tmp*b[ind];
-					H += tmp*val;
+					int ind = x->index-1;
+					if(b[ind] > 0)
+					{
+						double val = x->value;
+						double tmp = C[GETI(ind)]*val;
+						G_loss -= tmp*b[ind];
+						H += tmp*val;
+					}
+					x++;
 				}
-				x++;
+			}
+			else
+			{
+#pragma omp parallel for schedule(static) reduction(+: H) reduction(-: G_loss)
+				for(int k = 0; k < nnz_per_feature[j]; k++)
+				{
+					feature_node *xk = x + k;
+					int ind = xk->index-1;
+					if(b[ind] > 0)
+					{
+						double val = xk->value;
+						double tmp = C[GETI(ind)]*val;
+						G_loss -= tmp*b[ind];
+						H += tmp*val;
+					}
+				}
 			}
 			G_loss *= 2;
 
@@ -1653,7 +1705,10 @@ static void solve_l1r_l2_svc(
 				if(appxcond <= 0)
 				{
 					x = prob_col->x[j];
-					sparse_operator::axpy(d_diff, x, b);
+					if(nnz_per_feature[j] < omp_threshold) 
+						sparse_operator::axpy(d_diff, x, b);
+					else
+						sparse_operator::axpy_omp(d_diff, x, b, nnz_per_feature[j]);
 					break;
 				}
 
@@ -1662,30 +1717,64 @@ static void solve_l1r_l2_svc(
 					loss_old = 0;
 					loss_new = 0;
 					x = prob_col->x[j];
-					while(x->index != -1)
+					if(nnz_per_feature[j] < omp_threshold) 
 					{
-						int ind = x->index-1;
-						if(b[ind] > 0)
-							loss_old += C[GETI(ind)]*b[ind]*b[ind];
-						double b_new = b[ind] + d_diff*x->value;
-						b[ind] = b_new;
-						if(b_new > 0)
-							loss_new += C[GETI(ind)]*b_new*b_new;
-						x++;
+						while(x->index != -1)
+						{
+							int ind = x->index-1;
+							if(b[ind] > 0)
+								loss_old += C[GETI(ind)]*b[ind]*b[ind];
+							double b_new = b[ind] + d_diff*x->value;
+							b[ind] = b_new;
+							if(b_new > 0)
+								loss_new += C[GETI(ind)]*b_new*b_new;
+							x++;
+						}
+					} 
+					else 
+					{
+#pragma omp parallel for schedule(static) reduction(+: loss_old, loss_new)	
+						for(int k = 0; k < (int)nnz_per_feature[j]; k++)
+						{
+							feature_node *xk = x + k;
+							int ind = xk->index-1;
+							if(b[ind] > 0)
+								loss_old += C[GETI(ind)]*b[ind]*b[ind];
+							double b_new = b[ind] + d_diff*xk->value;
+							b[ind] = b_new;
+							if(b_new > 0)
+								loss_new += C[GETI(ind)]*b_new*b_new;
+						}
 					}
 				}
 				else
 				{
 					loss_new = 0;
 					x = prob_col->x[j];
-					while(x->index != -1)
+					if(nnz_per_feature[j] < omp_threshold) 
 					{
-						int ind = x->index-1;
-						double b_new = b[ind] + d_diff*x->value;
-						b[ind] = b_new;
-						if(b_new > 0)
-							loss_new += C[GETI(ind)]*b_new*b_new;
-						x++;
+						while(x->index != -1)
+						{
+							int ind = x->index-1;
+							double b_new = b[ind] + d_diff*x->value;
+							b[ind] = b_new;
+							if(b_new > 0)
+								loss_new += C[GETI(ind)]*b_new*b_new;
+							x++;
+						}
+					} 
+					else 
+					{
+#pragma omp parallel for schedule(static) reduction(+: loss_new)	
+						for(int k = 0; k < (int)nnz_per_feature[j]; k++)
+						{
+							feature_node *xk = x + k;
+							int ind = xk->index-1;
+							double b_new = b[ind] + d_diff*xk->value;
+							b[ind] = b_new;
+							if(b_new > 0)
+								loss_new += C[GETI(ind)]*b_new*b_new;
+						}
 					}
 				}
 
@@ -1706,6 +1795,7 @@ static void solve_l1r_l2_svc(
 			if(num_linesearch >= max_num_linesearch)
 			{
 				info("#");
+#pragma omp parallel for schedule(static) 
 				for(int i=0; i<l; i++)
 					b[i] = 1;
 
@@ -1713,7 +1803,10 @@ static void solve_l1r_l2_svc(
 				{
 					if(w[i]==0) continue;
 					x = prob_col->x[i];
-					sparse_operator::axpy(-w[i], x, b);
+					if(nnz_per_feature[j] < omp_threshold) 
+						sparse_operator::axpy(-w[i], x, b);
+					else
+						sparse_operator::axpy_omp(-w[i], x, b, nnz_per_feature[i]);
 				}
 			}
 		}
@@ -1773,6 +1866,7 @@ static void solve_l1r_l2_svc(
 	delete [] y;
 	delete [] b;
 	delete [] xj_sq;
+	delete [] nnz_per_feature;
 }
 
 // A coordinate descent algorithm for
@@ -1804,6 +1898,7 @@ static void solve_l1r_lr(
 	int max_num_linesearch = 20;
 	int active_size;
 	int QP_active_size;
+	int omp_threshold = 500;
 
 	double nu = 1e-12;
 	double inner_eps = 1;
@@ -1829,6 +1924,8 @@ static void solve_l1r_lr(
 	double *tau = new double[l];
 	double *D = new double[l];
 	feature_node *x;
+
+	int *nnz_per_feature = calc_nnz_per_feature(prob_col);
 
 	double C[3] = {Cn,0,Cp};
 
@@ -1886,13 +1983,29 @@ static void solve_l1r_lr(
 
 			double tmp = 0;
 			x = prob_col->x[j];
-			while(x->index != -1)
-			{
-				int ind = x->index-1;
-				Hdiag[j] += x->value*x->value*D[ind];
-				tmp += x->value*tau[ind];
-				x++;
-			}
+            if(nnz_per_feature[j] < omp_threshold)
+            {
+                while(x->index != -1)
+                {
+                	int ind = x->index-1;
+                	Hdiag[j] += x->value*x->value*D[ind];
+                	tmp += x->value*tau[ind];
+                	x++;
+                }
+            }
+            else
+            {
+                double Hdiag_tmp = 0;
+#pragma omp parallel for schedule(static) reduction(+: Hdiag_tmp, tmp)
+                for(int k = 0; k < nnz_per_feature[j]; k++)
+                {
+                    feature_node *xk = x + k;
+                    int ind = xk->index-1;
+                    Hdiag_tmp += xk->value*xk->value*D[ind];
+                    tmp += xk->value*tau[ind];
+                }
+                Hdiag[j] += Hdiag_tmp;
+            }
 			Grad[j] = -tmp + xjneg_sum[j];
 
 			double Gp = Grad[j]+1;
@@ -1932,6 +2045,7 @@ static void solve_l1r_lr(
 		QP_Gmax_old = INF;
 		QP_active_size = active_size;
 
+#pragma omp parallel for 
 		for(int i=0; i<l; i++)
 			xTd[i] = 0;
 
@@ -1954,11 +2068,26 @@ static void solve_l1r_lr(
 
 				x = prob_col->x[j];
 				G = Grad[j] + (wpd[j]-w[j])*nu;
-				while(x->index != -1)
+				if(nnz_per_feature[j] < omp_threshold)
 				{
-					int ind = x->index-1;
-					G += x->value*D[ind]*xTd[ind];
-					x++;
+					while(x->index != -1)
+					{
+						int ind = x->index-1;
+						G += x->value*D[ind]*xTd[ind];
+						x++;
+					}
+				}
+				else
+				{
+					double tmp = 0;
+#pragma omp parallel for schedule(static) reduction(+: tmp)	
+					for(int k = 0; k < nnz_per_feature[j]; k++)
+					{
+						feature_node *xk = x + k;
+						int ind = xk->index-1;
+						tmp += xk->value*D[ind]*xTd[ind];
+					}
+					G += tmp;
 				}
 
 				double Gp = G+1;
@@ -2002,7 +2131,10 @@ static void solve_l1r_lr(
 				wpd[j] += z;
 
 				x = prob_col->x[j];
-				sparse_operator::axpy(z, x, xTd);
+				if(nnz_per_feature[j] < omp_threshold)
+					sparse_operator::axpy(z, x, xTd);
+				else
+					sparse_operator::axpy_omp(z, x, xTd, nnz_per_feature[j]);
 			}
 
 			iter++;
@@ -2029,6 +2161,7 @@ static void solve_l1r_lr(
 
 		delta = 0;
 		w_norm_new = 0;
+#pragma omp parallel for schedule(static) reduction(+: delta, w_norm_new)	
 		for(j=0; j<w_size; j++)
 		{
 			delta += Grad[j]*(wpd[j]-w[j]);
@@ -2038,6 +2171,7 @@ static void solve_l1r_lr(
 		delta += (w_norm_new-w_norm);
 
 		negsum_xTd = 0;
+#pragma omp parallel for schedule(static) reduction(+: negsum_xTd)	
 		for(int i=0; i<l; i++)
 			if(y[i] == -1)
 				negsum_xTd += C[GETI(i)]*xTd[i];
@@ -2047,6 +2181,7 @@ static void solve_l1r_lr(
 		{
 			cond = w_norm_new - w_norm + negsum_xTd - sigma*delta;
 
+#pragma omp parallel for schedule(static) reduction(+: cond)	
 			for(int i=0; i<l; i++)
 			{
 				double exp_xTd = exp(xTd[i]);
@@ -2057,8 +2192,10 @@ static void solve_l1r_lr(
 			if(cond <= 0)
 			{
 				w_norm = w_norm_new;
+#pragma omp parallel for schedule(static)
 				for(j=0; j<w_size; j++)
 					w[j] = wpd[j];
+#pragma omp parallel for schedule(static)
 				for(int i=0; i<l; i++)
 				{
 					exp_wTx[i] = exp_wTx_new[i];
@@ -2071,6 +2208,7 @@ static void solve_l1r_lr(
 			else
 			{
 				w_norm_new = 0;
+#pragma omp parallel for schedule(static) reduction(+: w_norm_new)
 				for(j=0; j<w_size; j++)
 				{
 					wpd[j] = (w[j]+wpd[j])*0.5;
@@ -2079,6 +2217,7 @@ static void solve_l1r_lr(
 				}
 				delta *= 0.5;
 				negsum_xTd *= 0.5;
+#pragma omp parallel for schedule(static)
 				for(int i=0; i<l; i++)
 					xTd[i] *= 0.5;
 			}
@@ -2087,16 +2226,22 @@ static void solve_l1r_lr(
 		// Recompute some info due to too many line search steps
 		if(num_linesearch >= max_num_linesearch)
 		{
+#pragma omp parallel for schedule(static)
 			for(int i=0; i<l; i++)
 				exp_wTx[i] = 0;
 
+#pragma omp parallel for schedule(static)
 			for(int i=0; i<w_size; i++)
 			{
 				if(w[i]==0) continue;
 				x = prob_col->x[i];
-				sparse_operator::axpy(w[i], x, exp_wTx);
+				if(nnz_per_feature[i] < omp_threshold)
+					sparse_operator::axpy(w[i], x, exp_wTx);
+				else
+					sparse_operator::axpy_omp(w[i], x, exp_wTx, nnz_per_feature[i]);
 			}
 
+#pragma omp parallel for schedule(static)
 			for(int i=0; i<l; i++)
 				exp_wTx[i] = exp(exp_wTx[i]);
 		}
@@ -2145,6 +2290,7 @@ static void solve_l1r_lr(
 	delete [] exp_wTx_new;
 	delete [] tau;
 	delete [] D;
+	delete [] nnz_per_feature;
 }
 
 // transpose matrix X from row format to column format
