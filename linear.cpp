@@ -94,11 +94,11 @@ public:
 	static void axpy_omp(const double a, const feature_node *x, double *y, int nnz)
 	{
 #pragma omp parallel for schedule(static)
-        for(int k = 0; k < nnz; k++)
-        {
-            const feature_node *xk = x + k;
+		for(int k = 0; k < nnz; k++)
+		{
+			const feature_node *xk = x + k;
 			y[xk->index-1] += a*xk->value;
-        }
+		}
 	}
 };
 
@@ -1506,10 +1506,9 @@ void solve_l2r_lr_dual(const problem *prob, double *w, double eps, double Cp, do
 	delete [] index;
 }
 
-int* calc_nnz_per_feature(const problem *prob_col)
+static void calc_nnz_per_feature(const problem *prob_col, int *nnz_per_feature)
 {
 	int n = prob_col->n;
-	int *nnz_per_feature = new int[n];
 
 #pragma omp parallel
 	for(int j=0; j<n; j++)
@@ -1522,8 +1521,6 @@ int* calc_nnz_per_feature(const problem *prob_col)
 			x++;
 		}
 	}
-
-	return nnz_per_feature;
 }
 
 // A coordinate descent algorithm for
@@ -1572,7 +1569,8 @@ static void solve_l1r_l2_svc(
 
 	double C[3] = {Cn,0,Cp};
 
-	int *nnz_per_feature = calc_nnz_per_feature(prob_col);
+	int *nnz_per_feature = new int[w_size];
+	calc_nnz_per_feature(prob_col, nnz_per_feature);
 
 	// Initial w can be set here.
 	for(j=0; j<w_size; j++)
@@ -1925,7 +1923,8 @@ static void solve_l1r_lr(
 	double *D = new double[l];
 	feature_node *x;
 
-	int *nnz_per_feature = calc_nnz_per_feature(prob_col);
+	int *nnz_per_feature = new int[w_size];
+	calc_nnz_per_feature(prob_col, nnz_per_feature);
 
 	double C[3] = {Cn,0,Cp};
 

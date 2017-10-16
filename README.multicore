@@ -30,10 +30,21 @@ will run the L2-regularized l1-loss dual solver with 8 threads.
 Differences from LIBLINEAR
 ==========================
 
-The major changes for the primal solver are to do matrix-vector multiplications in
-parallel. The major changes for the dual solver are to calculate the gradients
-in parallel, and then do CD (coordinate descent) updates serially.
-Details could be seen in the references.
+	Primal L2-regularized solvers (-s 0, -s 2)
+	------------------------------------------
+	Do matrix-vector multiplications in parallel. 
+
+	Dual L2-regularized solvers (-s 1, -s 3, -s 11)
+	-----------------------------------------------
+	Calculate the gradients in parallel, and then do CD 
+	(coordinate descent) updates serially.
+
+	Primal L1-regularized solvers (-s 5, -s 6)
+	------------------------------------------
+	Parallelize feature-wise operations for the features
+	that have enough non-zeros.
+
+More details can be found in the reference.
 
 Experimental Results
 ====================
