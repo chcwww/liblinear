@@ -339,8 +339,8 @@ class parameter(Structure):
 			if not self.flag_solver_specified:
 				self.solver_type = L2R_L2LOSS_SVC
 				self.flag_solver_specified = True
-			elif self.solver_type not in [L2R_LR, L2R_L2LOSS_SVC, L2R_L2LOSS_SVR, L2R_L2LOSS_SVC_DUAL, L2R_L1LOSS_SVC_DUAL]:
-				raise ValueError("Parallel LIBLINEAR is only available for -s 0, 1, 2, 3, 11 now")
+			elif self.solver_type not in [L2R_LR, L2R_L2LOSS_SVC, L2R_L2LOSS_SVR, L2R_L2LOSS_SVC_DUAL, L2R_L1LOSS_SVC_DUAL, L1R_LR, L1R_L2LOSS_SVC]:
+				raise ValueError("Parallel LIBLINEAR is only available for -s 0, 1, 2, 3, 5, 6, 11 now")
 	
 		if self.eps == float('inf'):
 			if self.solver_type in [L2R_LR, L2R_L2LOSS_SVC]:
