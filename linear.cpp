@@ -1510,7 +1510,6 @@ static void calc_nnz_per_feature(const problem *prob_col, int *nnz_per_feature)
 {
 	int n = prob_col->n;
 
-#pragma omp parallel
 	for(int j=0; j<n; j++)
 	{
 		nnz_per_feature[j] = 0;	
