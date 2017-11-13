@@ -1506,22 +1506,6 @@ void solve_l2r_lr_dual(const problem *prob, double *w, double eps, double Cp, do
 	delete [] index;
 }
 
-static void calc_nnz_per_feature(const problem *prob_col, int *nnz_per_feature)
-{
-	int n = prob_col->n;
-
-	for(int j=0; j<n; j++)
-	{
-		nnz_per_feature[j] = 0;	
-		feature_node *x = prob_col->x[j];
-		while(x->index != -1)
-		{
-			nnz_per_feature[j]++;			
-			x++;
-		}
-	}
-}
-
 // A coordinate descent algorithm for
 // L1-regularized L2-loss support vector classification
 //
@@ -1569,7 +1553,6 @@ static void solve_l1r_l2_svc(
 	double C[3] = {Cn,0,Cp};
 
 	int *nnz_per_feature = new int[w_size];
-	calc_nnz_per_feature(prob_col, nnz_per_feature);
 
 	// Initial w can be set here.
 	for(j=0; j<w_size; j++)
@@ -1588,6 +1571,7 @@ static void solve_l1r_l2_svc(
 		index[j] = j;
 		xj_sq[j] = 0;
 		x = prob_col->x[j];
+		nnz_per_feature[j] = 0;	
 		while(x->index != -1)
 		{
 			int ind = x->index-1;
@@ -1595,6 +1579,7 @@ static void solve_l1r_l2_svc(
 			double val = x->value;
 			b[ind] -= w[j]*val;
 			xj_sq[j] += C[GETI(ind)]*val*val;
+            nnz_per_feature[j]++;	
 			x++;
 		}
 	}
@@ -1923,7 +1908,6 @@ static void solve_l1r_lr(
 	feature_node *x;
 
 	int *nnz_per_feature = new int[w_size];
-	calc_nnz_per_feature(prob_col, nnz_per_feature);
 
 	double C[3] = {Cn,0,Cp};
 
@@ -1949,6 +1933,7 @@ static void solve_l1r_lr(
 		index[j] = j;
 		xjneg_sum[j] = 0;
 		x = prob_col->x[j];
+        nnz_per_feature[j] = 0;
 		while(x->index != -1)
 		{
 			int ind = x->index-1;
@@ -1956,6 +1941,7 @@ static void solve_l1r_lr(
 			exp_wTx[ind] += w[j]*val;
 			if(y[ind] == -1)
 				xjneg_sum[j] += C[GETI(ind)]*val;
+            nnz_per_feature[j]++;
 			x++;
 		}
 	}
