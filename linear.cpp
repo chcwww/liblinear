@@ -1579,7 +1579,7 @@ static void solve_l1r_l2_svc(
 			double val = x->value;
 			b[ind] -= w[j]*val;
 			xj_sq[j] += C[GETI(ind)]*val*val;
-            nnz_per_feature[j]++;	
+			nnz_per_feature[j]++;	
 			x++;
 		}
 	}
@@ -1933,7 +1933,7 @@ static void solve_l1r_lr(
 		index[j] = j;
 		xjneg_sum[j] = 0;
 		x = prob_col->x[j];
-        nnz_per_feature[j] = 0;
+		nnz_per_feature[j] = 0;
 		while(x->index != -1)
 		{
 			int ind = x->index-1;
@@ -1941,7 +1941,7 @@ static void solve_l1r_lr(
 			exp_wTx[ind] += w[j]*val;
 			if(y[ind] == -1)
 				xjneg_sum[j] += C[GETI(ind)]*val;
-            nnz_per_feature[j]++;
+			nnz_per_feature[j]++;
 			x++;
 		}
 	}
