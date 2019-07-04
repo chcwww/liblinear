@@ -103,7 +103,7 @@ void TRON::tron(double *w)
 	if (gnorm <= eps*gnorm0)
 		search = 0;
 
-	fun_obj->get_diagH(M);
+	fun_obj->get_diag_preconditioner(M);
 	for(i=0; i<n; i++)
 		M[i] = (1-alpha_pcg) + alpha_pcg*M[i];
 	delta = sqrt(uTMv(n, g, M, g));
@@ -162,7 +162,7 @@ void TRON::tron(double *w)
 			memcpy(w, w_new, sizeof(double)*n);
 			f = fnew;
 			fun_obj->grad(w, g);
-			fun_obj->get_diagH(M);
+			fun_obj->get_diag_preconditioner(M);
 			for(i=0; i<n; i++)
 				M[i] = (1-alpha_pcg) + alpha_pcg*M[i];
 
@@ -217,8 +217,9 @@ int TRON::trpcg(double delta, double *g, double *M, double *s, double *r, bool *
 	zTr = ddot_(&n, z, &inc, r, &inc);
 	cgtol = eps_cg*sqrt(zTr);
 	int cg_iter = 0;
+	int max_cg_iter = max(n, 5);
 
-	while (1)
+	while (cg_iter < max_cg_iter)
 	{
 		if (sqrt(zTr) <= cgtol)
 			break;
@@ -262,6 +263,9 @@ int TRON::trpcg(double delta, double *g, double *M, double *s, double *r, bool *
 		zTr = znewTrnew;
 	}
 
+	if (cg_iter == max_cg_iter)
+		info("WARNING: reaching maximal number of CG steps\n");
+	
 	delete[] d;
 	delete[] Hd;
 	delete[] z;
