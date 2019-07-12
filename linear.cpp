@@ -2683,6 +2683,7 @@ static void find_parameter_C(const problem *prob, parameter *param_tmp, double s
 				norm_w_diff = sqrt(norm_w_diff);
 
 				if(norm_w_diff > 1e-15)
+#pragma omp critical
 					num_unchanged_w = -1;
 			}
 			else
