@@ -2657,8 +2657,9 @@ static void find_parameter_C(const problem *prob, parameter *param_tmp, double s
 			int begin = fold_start[i];
 			int end = fold_start[i+1];
 
-			param_tmp->init_sol = prev_w[i];
-			struct model *submodel = train(&subprob[i],param_tmp);
+			struct parameter param_t = *param_tmp;
+			param_t.init_sol = prev_w[i];
+			struct model *submodel = train(&subprob[i],&param_t);
 
 			int total_w_size;
 			if(submodel->nr_class == 2)
