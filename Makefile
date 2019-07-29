@@ -1,6 +1,7 @@
 CXX ?= g++
 CC ?= gcc
 CFLAGS = -Wall -Wconversion -O3 -fPIC -fopenmp
+# Uncomment the following line to turn on parallelization for CV
 # CFLAGS += -DCV_OMP
 LIBS = blas/blas.a
 SHVER = 3

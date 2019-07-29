@@ -9,12 +9,18 @@ Currently, -s 0 (solving primal LR), -s 2 (solving primal l2-loss SVM),
 -s 6 (solving primal l1-regularized logistic regression),
 and -s 11 (solving primal l2-loss SVR) are supported.
 
+Note: Parallelization on cross-validation or parameter search is turned off
+by default, to enable it please refer to Section
+"Parallelization on Cross-validation and Parameter Search (for ALL solvers)"
+at https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/multicore-liblinear/
+
 Usage
 =====
 
 The usage is the same as liblinear except for the additional option:
 
--n nr_thread: use nr_thread threads for training (only for -s 0, -s 1, -s 2, -s 3, -s 5, -s 6, and -s 11)
+-n nr_thread: use nr_thread threads for parallelizing solvers
+(only for -s 0, -s 1, -s 2, -s 3, -s 5, -s 6, and -s 11)
 
 Examples
 ========
