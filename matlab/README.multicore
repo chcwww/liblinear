@@ -3,6 +3,17 @@ Introduction
 
 This extension of liblinear provides a matlab interface to multi-core parallel learning.  
 
+Installation
+============
+
+If the code does not run properly, probably a compiler version not supported yet by MATLAB was used. You can try to use an older version. For example, if g++ X.Y is supported, replace
+
+CXX = g++
+
+in the Makefile with
+
+CXX = g++-X.Y
+
 Usage
 =====
 
