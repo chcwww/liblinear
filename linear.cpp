@@ -274,6 +274,7 @@ double l2r_erm_fun::linesearch_and_update(double *w, double *s, double *f, doubl
 	double fold = *f;
 	Xv(s, tmp);
 
+#pragma omp parallel for private(i) reduction(+:sTs,wTs,gTs) schedule(static)
 	for (i=0;i<w_size;i++)
 	{
 		sTs += s[i] * s[i];
@@ -291,6 +292,7 @@ double l2r_erm_fun::linesearch_and_update(double *w, double *s, double *f, doubl
 	for(num_linesearch=0; num_linesearch < max_num_linesearch; num_linesearch++)
 	{
 		double loss = 0;
+#pragma omp parallel for private(i) reduction(+:loss) schedule(static)
 		for(i=0;i<l;i++)
 		{
 			double inner_product = tmp[i] * alpha + wx[i];
@@ -299,6 +301,7 @@ double l2r_erm_fun::linesearch_and_update(double *w, double *s, double *f, doubl
 		*f = loss + (alpha * alpha * sTs + wTw) / 2.0 + alpha * wTs;
 		if (*f - fold <= eta * alpha * gTs)
 		{
+#pragma omp parallel for private(i) schedule(static)
 			for (i=0;i<l;i++)
 				wx[i] += alpha * tmp[i];
 			break;
@@ -313,9 +316,12 @@ double l2r_erm_fun::linesearch_and_update(double *w, double *s, double *f, doubl
 		return 0;
 	}
 	else
+	{
+#pragma omp parallel for private(i) schedule(static)
 		for (i=0;i<w_size;i++)
 			w[i] += alpha * s[i];
-
+	}
+	
 	wTw += alpha * alpha * sTs + 2* alpha * wTs;
 	return alpha;
 }
@@ -457,22 +463,6 @@ void l2r_lr_fun::Hv(double *s, double *Hs)
 		Hs[w_size-1] -= s[w_size-1];
 }
 
-
-void l2r_lr_fun::XTv(double *v, double *XTv)
-{
-	int i;
-	int l=prob->l;
-	feature_node **x=prob->x;
-
-	reduce_vectors->init();
-
-#pragma omp parallel for private(i) schedule(guided)
-	for(i=0;i<l;i++)
-		reduce_vectors->sum_scale_x(v[i], x[i]);
-	
-	reduce_vectors->reduce_sum(XTv);
-}
-
 class l2r_l2_svc_fun: public l2r_erm_fun
 {
 public:
@@ -503,7 +493,6 @@ l2r_l2_svc_fun::l2r_l2_svc_fun(const problem *prob, const parameter *param, doub
 l2r_l2_svc_fun::~l2r_l2_svc_fun()
 {
 	delete[] I;
-	delete reduce_vectors;
 }
 
 double l2r_l2_svc_fun::C_times_loss(int i, double wx_i)
@@ -1206,10 +1195,12 @@ static int solve_l2r_l1l2_svc(const problem *prob, const parameter *param, doubl
 			continue;
 		}
 
-		if(PGmax_new - PGmin_new <= eps1)
+		if(PGmax_new - PGmin_new <= eps1 &&
+			fabs(PGmax_new) <= eps1 && fabs(PGmin_new) <= eps1)
 			eps1 = max(0.1*eps1, min_eps1);
 
-		if(PGmax_new - PGmin_new <= eps)
+		if(PGmax_new - PGmin_new <= eps &&
+			fabs(PGmax_new) <= eps && fabs(PGmin_new) <= eps)
 		{
 			if(active_size == l)
 				break;

@@ -56,7 +56,7 @@ void exit_with_help()
 	"-wi weight: weights adjust the parameter C of different classes (see README for details)\n"
 	"-v n: n-fold cross validation mode\n"
 	"-C : find parameters (C for -s 0, 2 and C, p for -s 11)\n"
-	"-n nr_thread : parallel version with [nr_thread] threads (default 1; only for -s 0, 1, 2, 3, 5, 6, 11)\n"
+	"-m nr_thread : parallel version with [nr_thread] threads (default 1; only for -s 0, 1, 2, 3, 5, 6, 11)\n"
 	"-q : quiet mode (no outputs)\n"
 	);
 	exit(1);
@@ -271,7 +271,7 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 				bias = atof(argv[i]);
 				break;
 
-			case 'n':
+			case 'm':
 				flag_omp = 1;
 				param.nr_thread = atoi(argv[i]);
 				break;

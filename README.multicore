@@ -19,17 +19,17 @@ Usage
 
 The usage is the same as liblinear except for the additional option:
 
--n nr_thread: use nr_thread threads for parallelizing solvers
+-m nr_thread: use nr_thread threads for parallelizing solvers
 (only for -s 0, -s 1, -s 2, -s 3, -s 5, -s 6, and -s 11)
 
 Examples
 ========
 
-> ./train -s 0 -n 8 heart_scale
+> ./train -s 0 -m 8 heart_scale
 
 will run the L2-regularized logistic regression primal solver with 8 threads.
 
-> ./train -s 3 -n 8 heart_scale
+> ./train -s 3 -m 8 heart_scale
 
 will run the L2-regularized l1-loss dual solver with 8 threads.
 

@@ -310,7 +310,7 @@ class parameter(Structure):
 				self.nr_fold = int(argv[i])
 				if self.nr_fold < 2 :
 					raise ValueError("n-fold cross validation: n must >= 2")
-			elif argv[i] == "-n":
+			elif argv[i] == "-m":
 				i = i + 1
 				self.flag_omp = True
 				self.nr_thread = int(argv[i])
