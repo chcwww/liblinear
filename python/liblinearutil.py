@@ -14,7 +14,7 @@ if sys.version_info[0] < 3:
 	from itertools import izip as zip
 	_cstr = lambda s: s.encode("utf-8") if isinstance(s,unicode) else str(s)
 else:
-	_cstr = lambda s: bytes(s, "utf-8")        
+	_cstr = lambda s: bytes(s, "utf-8")
 
 __all__ = ['load_model', 'save_model', 'train', 'predict'] + liblinear_all + common_all
 
@@ -75,6 +75,8 @@ def train(arg1, arg2=None, arg3=None):
 			11 -- L2-regularized L2-loss support vector regression (primal)
 			12 -- L2-regularized L2-loss support vector regression (dual)
 			13 -- L2-regularized L1-loss support vector regression (dual)
+		  for outlier detection
+			21 -- one-class support vector machine (dual)
 		-c cost : set the parameter C (default 1)
 		-p epsilon : set the epsilon in loss function of SVR (default 0.1)
 		-e epsilon : set tolerance of termination criterion
@@ -83,8 +85,8 @@ def train(arg1, arg2=None, arg3=None):
 				where f is the primal function, (default 0.01)
 			-s 11
 				|f'(w)|_2 <= eps*|f'(w0)|_2 (default 0.0001)
-			-s 1, 3, 4, and 7
-				Dual maximal violation <= eps; similar to liblinear (default 0.)
+			-s 1, 3, 4, 7, and 21
+				Dual maximal violation <= eps; similar to libsvm (default 0.1 except 0.01 for -s 21)
 			-s 5 and 6
 				|f'(w)|_inf <= eps*min(pos,neg)/l*|f'(w0)|_inf,
 				where f is the primal function (default 0.01)
@@ -92,6 +94,8 @@ def train(arg1, arg2=None, arg3=None):
 				|f'(alpha)|_1 <= eps |f'(alpha0)|,
 				where f is the dual function (default 0.1)
 		-B bias : if bias >= 0, instance x becomes [x; bias]; if < 0, no bias term added (default -1)
+		-R : not regularize the bias; must with -B 1 to have the bias; DON'T use this unless you know what it is
+			(for -s 0, 2, 5, 6, 11)"
 		-wi weight: weights adjust the parameter C of different classes (see README for details)
 		-v n: n-fold cross validation mode
 		-C : find parameters (C for -s 0, 2 and C, p for -s 11)
