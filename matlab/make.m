@@ -12,8 +12,8 @@ try
 	% This part is for MATLAB
 	% Add -largeArrayDims on 64-bit machines of MATLAB
 	else
-		mex CFLAGS="\$CFLAGS -std=c99" -largeArrayDims libsvmread.c
-		mex CFLAGS="\$CFLAGS -std=c99" -largeArrayDims libsvmwrite.c
+		mex -largeArrayDims libsvmread.c
+		mex -largeArrayDims libsvmwrite.c
 		mex CFLAGS="\$CFLAGS -fopenmp" CXXFLAGS='$CXXFLAGS -fopenmp' -I.. -largeArrayDims -lgomp train.c linear_model_matlab.c ../linear.cpp ../newton.cpp ../blas/daxpy.c ../blas/ddot.c ../blas/dnrm2.c ../blas/dscal.c
 		mex CFLAGS="\$CFLAGS -fopenmp" CXXFLAGS='$CXXFLAGS -fopenmp' -I.. -largeArrayDims -lgomp predict.c linear_model_matlab.c ../linear.cpp ../newton.cpp ../blas/daxpy.c ../blas/ddot.c ../blas/dnrm2.c ../blas/dscal.c
 	end
