@@ -15,7 +15,7 @@ build_ext.get_export_symbols = lambda x, y: []
 
 
 PACKAGE_DIR = "liblinear"
-PACKAGE_NAME = "liblinear-official"
+PACKAGE_NAME = "liblinear-multicore"
 VERSION = "2.43.0"
 cpp_dir = "cpp-source"
 # should be consistent with dynamic_lib_name in liblinear/liblinear.py
@@ -94,12 +94,12 @@ def main():
         name=PACKAGE_NAME,
         packages=[PACKAGE_DIR],
         version=VERSION,
-        description="Python binding of LIBLINEAR",
+        description="Python binding of multi-core LIBLINEAR",
         long_description=long_description,
         long_description_content_type="text/plain",
         author="ML group @ National Taiwan University",
         author_email="cjlin@csie.ntu.edu.tw",
-        url="https://www.csie.ntu.edu.tw/~cjlin/liblinear",
+        url="https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/multicore-liblinear",
         install_requires=["scipy"],
         ext_modules=[
             Extension(
