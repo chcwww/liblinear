@@ -43,6 +43,8 @@ kwargs_for_extension = {
     "depends": [path.join(cpp_dir, f) for f in headers],
     "include_dirs": [cpp_dir],
     "language": "c++",
+    "extra_compile_args": ["-fopenmp"],
+    "extra_link_args": ["-lgomp"],
 }
 
 # see ../Makefile.win
@@ -50,7 +52,7 @@ if sys.platform == "win32":
     kwargs_for_extension.update(
         {
             "define_macros": [("_WIN64", ""), ("_CRT_SECURE_NO_DEPRECATE", "")],
-            "extra_link_args": ["-DEF:{}\linear.def".format(cpp_dir)],
+            "extra_link_args": ["-DEF:{}\linear.def".format(cpp_dir), "-lgomp"],
         }
     )
 
