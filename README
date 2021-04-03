@@ -33,7 +33,7 @@ Table of Contents
 - Library Usage
 - Building Windows Binaries
 - MATLAB/OCTAVE interface
-- PYTHON interface
+- Python interface
 - References for Multi-core Implementations
 - Additional Information
 
@@ -712,7 +712,7 @@ MATLAB/OCTAVE Interface
 
 Please check the file README in the directory `matlab'.
 
-PYTHON Interface
+Python Interface
 ================
 
 Please check the file README in the directory `python'.
