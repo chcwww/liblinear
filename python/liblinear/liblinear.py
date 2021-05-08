@@ -354,6 +354,7 @@ class parameter(Structure):
 
         if self.flag_omp:
             if not self.flag_solver_specified:
+                print("Solver not specified. Using -s 2")
                 self.solver_type = L2R_L2LOSS_SVC
                 self.flag_solver_specified = True
             elif self.solver_type not in [L2R_LR, L2R_L2LOSS_SVC, L2R_L2LOSS_SVR, L2R_L2LOSS_SVC_DUAL, L2R_L1LOSS_SVC_DUAL, L1R_LR, L1R_L2LOSS_SVC]:
