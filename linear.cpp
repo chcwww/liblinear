@@ -238,14 +238,16 @@ double l2r_erm_fun::fun(double *w)
 	int l=prob->l;
 	int w_size=get_nr_variable();
 
-	wTw = 0;
+	// wTw, a class member, cannot be used by MS Visual C++ for openmp reduction
+	double local_wTw = 0;
 	Xv(w, wx);
 
-#pragma omp parallel for private(i) reduction(+:wTw) schedule(static)
+#pragma omp parallel for private(i) reduction(+:local_wTw) schedule(static)
 	for(i=0;i<w_size;i++)
-		wTw += w[i]*w[i];
+		local_wTw += w[i]*w[i];
 	if(regularize_bias == 0)
-		wTw -= w[w_size-1]*w[w_size-1];
+		local_wTw -= w[w_size-1]*w[w_size-1];
+	wTw = local_wTw;
 #pragma omp parallel for private(i) reduction(+:f) schedule(static)
 	for(i=0;i<l;i++)
 		f += C_times_loss(i, wx[i]);
