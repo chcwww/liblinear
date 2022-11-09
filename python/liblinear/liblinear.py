@@ -357,8 +357,9 @@ class parameter(Structure):
                 print("Solver not specified. Using -s 2")
                 self.solver_type = L2R_L2LOSS_SVC
                 self.flag_solver_specified = True
-            elif self.solver_type not in [L2R_LR, L2R_L2LOSS_SVC, L2R_L2LOSS_SVR, L2R_L2LOSS_SVC_DUAL, L2R_L1LOSS_SVC_DUAL, L1R_LR, L1R_L2LOSS_SVC]:
-                raise ValueError("Parallel LIBLINEAR is only available for -s 0, 1, 2, 3, 5, 6, 11 now")
+            elif self.solver_type not in [L2R_LR, L2R_L2LOSS_SVC, L2R_L2LOSS_SVR, L2R_L1LOSS_SVC_DUAL, L2R_L2LOSS_SVC_DUAL, L1R_L2LOSS_SVC, L1R_LR]:
+                print("WARNING: parallel solvers are only available for -s 0, 1, 2, 3, 5, 6, 11 now; use single-core solvers instead.\n")
+                self.nr_thread = 1
 
         if self.eps == float('inf'):
             if self.solver_type in [L2R_LR, L2R_L2LOSS_SVC]:
