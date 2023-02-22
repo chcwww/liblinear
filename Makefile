@@ -4,9 +4,14 @@ CFLAGS = -Wall -Wconversion -O3 -fPIC -fopenmp
 # Uncomment the following line to turn on parallelization for CV
 # CFLAGS += -DCV_OMP
 LIBS = blas/blas.a
+#LIBS = -lblas
 SHVER = 5
 OS = $(shell uname)
-#LIBS = -lblas
+ifeq ($(OS),Darwin)
+	SHARED_LIB_FLAG = -dynamiclib -Wl,-install_name,liblinear.so.$(SHVER)
+else
+	SHARED_LIB_FLAG = -shared -Wl,-soname,liblinear.so.$(SHVER)
+endif
 
 all: train predict
 
