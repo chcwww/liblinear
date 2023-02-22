@@ -384,9 +384,10 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 			param.solver_type != L2R_L1LOSS_SVC_DUAL &&
 			param.solver_type != L2R_L2LOSS_SVC_DUAL &&
 			param.solver_type != L1R_L2LOSS_SVC &&
-			param.solver_type != L1R_LR)
+			param.solver_type != L1R_LR &&
+			param.solver_type != ONECLASS_SVM)
 		{
-			printf("WARNING: parallel solvers are only available for -s 0, 1, 2, 3, 5, 6, 11 now; use single-core solvers instead.\n");
+			printf("WARNING: parallel solvers are only available for -s 0, 1, 2, 3, 5, 6, 11, 21 now; use single-core solvers instead.\n");
 			param.nr_thread = 1;
 		}
 	}
