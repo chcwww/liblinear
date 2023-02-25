@@ -16,12 +16,7 @@ endif
 all: train predict
 
 lib: linear.o newton.o blas/blas.a
-	if [ "$(OS)" = "Darwin" ]; then \
-		SHARED_LIB_FLAG="-dynamiclib -Wl,-install_name,liblinear.so.$(SHVER)"; \
-	else \
-		SHARED_LIB_FLAG="-shared -Wl,-soname,liblinear.so.$(SHVER)"; \
-	fi; \
-	$(CXX) -fopenmp $${SHARED_LIB_FLAG} linear.o newton.o blas/blas.a -o liblinear.so.$(SHVER)
+	$(CXX) -fopenmp $(SHARED_LIB_FLAG) linear.o newton.o blas/blas.a -o liblinear.so.$(SHVER)
 
 train: newton.o linear.o train.c blas/blas.a
 	$(CXX) $(CFLAGS) -o train train.c newton.o linear.o $(LIBS)

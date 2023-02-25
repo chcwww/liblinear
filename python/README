@@ -83,7 +83,7 @@ and imported by svmutil.py). The usage is the same as the LIBLINEAR
 MATLAB interface.
 
 Specify the option '-m nr_thread' to use nr_thread threads for parallelizing solvers
-(only for -s 0, -s 1, -s 2, -s 3, -s 5, -s 6, and -s 11)
+(only for -s 0, -s 1, -s 2, -s 3, -s 5, -s 6, -s 11 and -s 21)
 
 >>> from liblinear.liblinearutil import *
 # Read data in LIBSVM format
