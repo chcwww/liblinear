@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 from ctypes import *
 from ctypes.util import find_library
 from os import path
@@ -128,10 +126,18 @@ try:
     from numba import jit
     jit_enabled = True
 except:
-    jit = lambda x: x
+    # We need to support two cases: when jit is called with no arguments, and when jit is called with
+    # a keyword argument.
+    def jit(func=None, *args, **kwargs):
+        if func is None:
+            # This handles the case where jit is used with parentheses: @jit(nopython=True)
+            return lambda x: x
+        else:
+            # This handles the case where jit is used without parentheses: @jit
+            return func
     jit_enabled = False
 
-@jit
+@jit(nopython=True)
 def csr_to_problem_jit(l, x_val, x_ind, x_rowptr, prob_val, prob_ind, prob_rowptr):
     for i in range(l):
         b1,e1 = x_rowptr[i], x_rowptr[i+1]
