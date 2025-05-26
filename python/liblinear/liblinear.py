@@ -383,9 +383,9 @@ class parameter(Structure):
         if self.flag_omp:
             if not self.flag_solver_specified:
                 print("Solver not specified. Using -s 2")
-                self.solver_type = L2R_L2LOSS_SVC
+                self.solver_type = solver_names.L2R_L2LOSS_SVC
                 self.flag_solver_specified = True
-            elif self.solver_type not in [L2R_LR, L2R_L2LOSS_SVC, L2R_L2LOSS_SVR, L2R_L1LOSS_SVC_DUAL, L2R_L2LOSS_SVC_DUAL, L1R_L2LOSS_SVC, L1R_LR, ONECLASS_SVM]:
+            elif self.solver_type not in [solver_names.L2R_LR, solver_names.L2R_L2LOSS_SVC, solver_names.L2R_L2LOSS_SVR, solver_names.L2R_L1LOSS_SVC_DUAL, solver_names.L2R_L2LOSS_SVC_DUAL, solver_names.L1R_L2LOSS_SVC, solver_names.L1R_LR, solver_names.ONECLASS_SVM]:
                 print("WARNING: parallel solvers are only available for -s 0, 1, 2, 3, 5, 6, 11, 21 now; use single-core solvers instead.\n")
                 self.nr_thread = 1
 
